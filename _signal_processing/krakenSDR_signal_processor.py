@@ -78,8 +78,8 @@ class SignalProcessor(threading.Thread):
         self.logger.setLevel(logging_level)
 
         root_path      = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        doa_res_file_path = os.path.join(os.path.join(root_path,"_android_web","DOA_value.html"))        
-        self.DOA_res_fd = open(doa_res_file_path,"w+")
+        #doa_res_file_path = os.path.join(os.path.join(root_path,"_android_web","DOA_value.html"))        
+        #self.DOA_res_fd = open(doa_res_file_path,"w+")
 
         self.module_receiver = module_receiver
         self.data_que = data_que
