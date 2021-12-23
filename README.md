@@ -1,10 +1,6 @@
-# Kraken SDR DoA DSP
-This software is intended to demonstrate the direction of arrival (DoA) estimation capabilities of the KrakenSDR and other RTL-SDR based coherent receiver systems which use the compatible data acquisition system - HeIMDALL DAQ Firmware.
-<br>
-<br>
-The complete application is broken down into two main modules in terms of implementation, into the DAQ Subsystem and to the DSP Subsystem. These two modules can operate together either remotely through Ethernet connection or locally on the same host using shared-memory.
+# Kraken SDR Passive Radar
 
-Running these two subsystems on separate processing units can grant higher throughput and stability, while running on the same processing unit makes the entire system more compact.
+NOTE still under development.
 
 ## Installation
 
@@ -12,7 +8,8 @@ Running these two subsystems on separate processing units can grant higher throu
 
 ``` bash
 sudo apt update
-sudo apt install php-cli
+sudo apt install libfftw3-3
+sudo apt install libfftw3-dev
 ```
 
 2. Install Heimdall DAQ
@@ -36,24 +33,26 @@ conda install matplotlib
 pip3 install dash_bootstrap_components
 pip3 install quart_compress
 pip3 install dash_devices
-pip3 install pyargus
+pip3 install pyapril
+pip3 install cython
+pip3 install pyfftw
 
 conda install dash==1.20.0
 ```
 
-4. Install the krakensdr_doa software
+4. Install the krakensdr_pr software
 
 ```bash
 cd ~/krakensdr
-git clone https://github.com/krakenrf/krakensdr_doa
-cd krakensdr_doa
-git checkout clientside_graphs
+git clone https://github.com/krakenrf/krakensdr_pr
+cd krakensdr_pr
+git checkout development
 ```
 
 Copy the the *krakensdr_doa/util/kraken_doa_start.sh* and the *krakensdr_doa/util/kraken_doa_stop.sh* scripts into the krakensdr root folder of the project.
 ```bash
 cd ~/krakensdr
-cp krakensdr_doa/util/kraken_doa_start.sh .
+cp krakensdr_doa/util/kraken_pr_start.sh .
 cp krakensdr_doa/util/kraken_doa_stop.sh .
 ```
 
@@ -62,10 +61,12 @@ cp krakensdr_doa/util/kraken_doa_stop.sh .
 ### Local operation (Recommended)
 
 ```bash
-./kraken_doa_start.sh
+./kraken_pr_start.sh
 ```
 
 Please be patient on the first run, at it can take 1-2 minutes for the JIT numba compiler to compile the numba optimized functions, and during this compilation time it may appear that the software has gotten stuck. On subsqeuent runs this loading time will be much faster as it will read from cache.
+
+Make sure to set an appropriate passive radar config ini for the Heimdall DAQ. (MORE INFO TO BE ADDED SOON, but basically, set decimation and FIR filtering to 1, set the sample rate to the max of 2.56 MHz, set the nubmer of RX channels to 2, DAQ buffer size 262144, CPI size to 524288 or larger (must be a power of 2). Then use channel 1 to connect your reference antenna, and channel 2 for your surveillance antenna.)
 
 ### Remote operation
 
@@ -78,17 +79,3 @@ Please be patient on the first run, at it can take 1-2 minutes for the JIT numba
 `./kill.sh`
 
 <p1> After starting the script a web based server opens at port number 8051, which then can be accessed by typing "KRAKEN_IP:8050/" in the address bar of any web browser. You can find the IP address of the KrakenSDR Pi4 wither via your routers WiFi management page, or by typing "ip addr" into the terminal. You can also use the hostname of the Pi4 in place of the IP address, but this only works on local networks, and not the internet, or mobile hotspot networks. </p1>
-
-  ![image info](./doc/kraken_doadsp_main.png)
-
-## Upcoming Features and Known Bugs
-
-1. [FEATURE] Currently squelch works by selecting the strongest signal that is active and above the set threshold within the active bandwidth. The next steps will be to allow users to create multiple channels within the active bandwidth, each with their own squelch. This will allow users to track multiple signals at once, and ignore unwated signals within the bandwidth at the same time.
-
-2. [FEATURE] It would be better if the KrakenSDR controls, spectrum and/or DOA graphs could be accessible from the same page. Future work will look to integrate the controls in a sidebar.
-
-3. [FEATURE] Some users would like to monitor the spectrum, and manually click on an active signal to DF that particular signal. We will be looking at a way to implement this.  
-
-4. [BUG] Sometimes the DOA graphs will not load properly and refreshing the page is required. A fix is being investigated.
-
-This software was 95% developed by Tamas Peto, and makes use of his pyAPRIL and pyARGUS libraries. See his website at www.tamaspeto.com
