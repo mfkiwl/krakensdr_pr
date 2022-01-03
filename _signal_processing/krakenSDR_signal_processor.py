@@ -234,19 +234,21 @@ class SignalProcessor(threading.Thread):
                         N_perseg = 0
                         N_perseg = min(N, len(self.processed_signal[0,:])//25)
                         N_perseg = N_perseg // 1
-
-                        # Get power spectrum
-                        f, Pxx_den = signal.welch(self.processed_signal, self.module_receiver.iq_header.sampling_freq//first_decimation_factor,
+                       
+                        for m in range(self.channel_number):
+                            # Get power spectrum
+                            f, Pxx_den = signal.welch(self.processed_signal[m, :], self.module_receiver.iq_header.sampling_freq//first_decimation_factor,
                                                 nperseg=N_perseg,
                                                 nfft=N,
-                                                noverlap=int(N_perseg*0.25),
+                                                noverlap=0, #int(N_perseg*0.25),
                                                 detrend=False,
                                                 return_onesided=False,
                                                 window= ('tukey', 0.25), #tukey window gives better time resolution for squelching #self.spectrum_window, #('tukey', 0.25), #self.spectrum_window, 
                                                 #window=self.spectrum_window,
                                                 scaling="spectrum")
 
-                        self.spectrum[1:self.module_receiver.iq_header.active_ant_chs+1,:] = np.fft.fftshift(10*np.log10(Pxx_den))
+                            self.spectrum[1+m, :] = np.fft.fftshift(10*np.log10(Pxx_den))
+                        #self.spectrum[1:self.module_receiver.iq_header.active_ant_chs+1,:] = np.fft.fftshift(10*np.log10(Pxx_den))
 
                         self.spectrum[0,:] = np.fft.fftshift(f)
 
