@@ -53,8 +53,8 @@ git checkout development
 Copy the the *krakensdr_doa/util/kraken_doa_start.sh* and the *krakensdr_doa/util/kraken_doa_stop.sh* scripts into the krakensdr root folder of the project.
 ```bash
 cd ~/krakensdr
-cp krakensdr_doa/util/kraken_pr_start.sh .
-cp krakensdr_doa/util/kraken_doa_stop.sh .
+cp krakensdr_pr/util/kraken_pr_start.sh .
+cp krakensdr_pr/util/kraken_pr_stop.sh .
 ```
 
 ## Running
