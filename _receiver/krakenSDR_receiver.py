@@ -56,7 +56,7 @@ class ReceiverRTLSDR():
         # These values are used by default to configure the DAQ through the configuration interface
         # Values are configured externally upon configuration request
         self.daq_center_freq   = 100 # MHz
-        self.daq_rx_gain       = 0   # [dB]
+        self.daq_rx_gain       = [0] * 100   # [dB]
         self.daq_squelch_th_dB = 0
 
         # UI interface
@@ -197,6 +197,7 @@ class ReceiverRTLSDR():
             # Inititalization from header - Set channel numbers
             if self.M == 0:
                 self.M = self.iq_header.active_ant_chs
+                self.daq_rx_gain = [0] * self.M
 
             incoming_payload_size = self.iq_header.cpi_length*self.iq_header.active_ant_chs*2*int(self.iq_header.sample_bit_depth/8)
             if incoming_payload_size > 0:
@@ -354,10 +355,15 @@ class ReceiverRTLSDR():
         """                
         if self.receiver_connection_status: # Check connection
             self.daq_rx_gain     = gain
-            
+
             # Set center frequency
             cmd="GAIN"
-            gain_list=[297, 37] #[int(gain*10)]*self.M
+
+            gain_list = []
+            for i in range(0, self.M):
+                gain_list.append(int(gain[i]*10))
+
+            #gain_list=[297, 37] #[int(gain*10)]*self.M
             gain_bytes=pack("I"*self.M, *gain_list)
             msg_bytes=(cmd.encode()+gain_bytes+bytearray(128-(self.M+1)*4))  
             try:                

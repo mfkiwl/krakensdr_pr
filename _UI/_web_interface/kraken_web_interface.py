@@ -119,13 +119,13 @@ class webInterface():
         # Instantiate and configure Kraken SDR modules
         self.module_receiver = ReceiverRTLSDR(data_que=self.rx_data_que, data_interface=settings.data_interface, logging_level=settings.logging_level*10)
         self.module_receiver.daq_center_freq   = settings.center_freq*10**6
-        self.module_receiver.daq_rx_gain       = settings.uniform_gain        
+        self.module_receiver.daq_rx_gain       = [settings.gain_1, settings.gain_2]
         #self.module_receiver.daq_squelch_th_dB = settings.squelch_threshold_dB
         self.module_receiver.rec_ip_addr       = settings.default_ip
 
         self.module_signal_processor = SignalProcessor(data_que=self.sp_data_que, module_receiver=self.module_receiver, logging_level=settings.logging_level*10)        
         #self.module_signal_processor.DOA_ant_alignment    = settings.ant_arrangement
-        #self.module_signal_processor.DOA_inter_elem_space = settings.ant_spacing 
+        #self.module_signal_processor.DOA_inter_elem_space = settings.ant_spacing
         self.module_signal_processor.en_PR    = settings.en_pr
         self.module_signal_processor.PR_clutter_cancellation = settings.clutter_cancel_algo
         self.module_signal_processor.max_bistatic_range = settings.max_bistatic_range
@@ -224,7 +224,9 @@ class webInterface():
 
         # DAQ Configuration
         data["center_freq"]    = self.module_receiver.daq_center_freq/10**6
-        data["uniform_gain"]   = self.module_receiver.daq_rx_gain
+        #data["uniform_gain"]   = self.module_receiver.daq_rx_gain
+        data["gain_1"]   = self.module_receiver.daq_rx_gain[0]
+        data["gain_2"]   = self.module_receiver.daq_rx_gain[1]
         data["data_interface"] = settings.data_interface
         data["default_ip"]     = settings.default_ip
         
@@ -332,7 +334,8 @@ class webInterface():
 
         webInterface_inst.logger.info("Updating receiver parameters")
         webInterface_inst.logger.info("Center frequency: {:f} MHz".format(f0))
-        webInterface_inst.logger.info("Gain: {:f} dB".format(gain))
+        #webInterface_inst.logger.info("Gain: {:f} dB".format(gain))
+        webInterface_inst.logger.info("Gain: " + ' '.join(str(x) for x in gain) + " dB")
 
 
 
@@ -650,6 +653,38 @@ def generate_config_page_layout(webInterface_inst):
     if daq_cfg_params[18] == 0: #If set to no tracking
         cfg_recal_interval = 1
 
+    gain_list = [
+                {'label': '0 dB',    'value': 0},
+                {'label': '0.9 dB',  'value': 0.9},
+                {'label': '1.4 dB',  'value': 1.4},
+                {'label': '2.7 dB',  'value': 2.7},
+                {'label': '3.7 dB',  'value': 3.7},
+                {'label': '7.7 dB',  'value': 7.7},
+                {'label': '8.7 dB',  'value': 8.7},
+                {'label': '12.5 dB', 'value': 12.5},
+                {'label': '14.4 dB', 'value': 14.4},
+                {'label': '15.7 dB', 'value': 15.7},
+                {'label': '16.6 dB', 'value': 16.6},
+                {'label': '19.7 dB', 'value': 19.7},
+                {'label': '20.7 dB', 'value': 20.7},
+                {'label': '22.9 dB', 'value': 22.9},
+                {'label': '25.4 dB', 'value': 25.4},
+                {'label': '28.0 dB', 'value': 28.0},
+                {'label': '29.7 dB', 'value': 29.7},
+                {'label': '32.8 dB', 'value': 32.8},
+                {'label': '33.8 dB', 'value': 33.8},
+                {'label': '36.4 dB', 'value': 36.4},
+                {'label': '37.2 dB', 'value': 37.2},
+                {'label': '38.6 dB', 'value': 38.6},
+                {'label': '40.2 dB', 'value': 40.2},
+                {'label': '42.1 dB', 'value': 42.1},
+                {'label': '43.4 dB', 'value': 43.4},
+                {'label': '43.9 dB', 'value': 43.9},
+                {'label': '44.5 dB', 'value': 44.5},
+                {'label': '48.0 dB', 'value': 48.0},
+                {'label': '49.6 dB', 'value': 49.6},
+                ]
+
 
     #for preconfig in preconfigs:
     #    print(preconfig[0])
@@ -668,39 +703,17 @@ def generate_config_page_layout(webInterface_inst):
         html.Div([
                 html.Div("Receiver gain", className="field-label"), 
                 dcc.Dropdown(id='daq_rx_gain',
-                        options=[
-                            {'label': '0 dB',    'value': 0},
-                            {'label': '0.9 dB',  'value': 0.9}, 
-                            {'label': '1.4 dB',  'value': 1.4},
-                            {'label': '2.7 dB',  'value': 2.7},
-                            {'label': '3.7 dB',  'value': 3.7},
-                            {'label': '7.7 dB',  'value': 7.7},
-                            {'label': '8.7 dB',  'value': 8.7},
-                            {'label': '12.5 dB', 'value': 12.5},
-                            {'label': '14.4 dB', 'value': 14.4},
-                            {'label': '15.7 dB', 'value': 15.7},
-                            {'label': '16.6 dB', 'value': 16.6},
-                            {'label': '19.7 dB', 'value': 19.7},
-                            {'label': '20.7 dB', 'value': 20.7},
-                            {'label': '22.9 dB', 'value': 22.9},
-                            {'label': '25.4 dB', 'value': 25.4},
-                            {'label': '28.0 dB', 'value': 28.0},
-                            {'label': '29.7 dB', 'value': 29.7},
-                            {'label': '32.8 dB', 'value': 32.8},
-                            {'label': '33.8 dB', 'value': 33.8},
-                            {'label': '36.4 dB', 'value': 36.4},
-                            {'label': '37.2 dB', 'value': 37.2},
-                            {'label': '38.6 dB', 'value': 38.6},
-                            {'label': '40.2 dB', 'value': 40.2},
-                            {'label': '42.1 dB', 'value': 42.1},
-                            {'label': '43.4 dB', 'value': 43.4},
-                            {'label': '43.9 dB', 'value': 43.9},
-                            {'label': '44.5 dB', 'value': 44.5},
-                            {'label': '48.0 dB', 'value': 48.0},
-                            {'label': '49.6 dB', 'value': 49.6},
-                            ],
-                    value=webInterface_inst.module_receiver.daq_rx_gain, clearable=False, className="field-body"),
+                        options=gain_list,
+                    value=webInterface_inst.module_receiver.daq_rx_gain[0], clearable=False, className="field-body"),
+                #], className="field"),
+
+                html.Div("Receiver 2 gain", className="field-label"), 
+                dcc.Dropdown(id='daq_rx_gain_2',
+                        options=gain_list,
+                    value=webInterface_inst.module_receiver.daq_rx_gain[1], clearable=False, className="field-body"),
                 ], className="field"),
+
+
         html.Div([
             html.Button('Update Receiver Parameters', id='btn-update_rx_param', className="btn"),
         ], className="field"),
@@ -1274,13 +1287,14 @@ def update_daq_status():
     Output(component_id="placeholder_update_freq", component_property="children"),
     [Input(component_id ="btn-update_rx_param"   , component_property="n_clicks")],
     [State(component_id ="daq_center_freq"       , component_property='value'),
-    State(component_id ="daq_rx_gain"           , component_property='value')],
+    State(component_id ="daq_rx_gain"           , component_property='value'),
+    State(component_id ="daq_rx_gain_2"           , component_property='value')],
 )
-def update_daq_params(input_value, f0, gain):
+def update_daq_params(input_value, f0, gain, gain_2):
     #if input_value is None:
     #    raise PreventUpdate
     webInterface_inst.daq_center_freq = f0
-    webInterface_inst.config_daq_rf(f0,gain)
+    webInterface_inst.config_daq_rf(f0, [gain, gain_2] ) # CARL: TO CHANGE THIS TO AUTO POPULATE EACH GAIN UP TO M RECEIVERS?
     return 1
 
 @app.callback([Output("page-content"   , "children"),

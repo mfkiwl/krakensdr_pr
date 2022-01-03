@@ -20,6 +20,8 @@ if os.path.exists(settings_file_path):
 # DAQ Configuration
 center_freq    = settings.get("center_freq", 100.0)
 uniform_gain   = settings.get("uniform_gain", 1.4)
+gain_1         = settings.get("gain_1", 1.4)
+gain_2         = settings.get("gain_2", 1.4)
 data_interface = settings.get("data_interface", "eth")
 default_ip     = settings.get("default_ip", "0.0.0.0")
 
@@ -68,6 +70,8 @@ def write(data = None):
         # DAQ Configuration
         data["center_freq"]    = center_freq    
         data["uniform_gain"]   = uniform_gain
+        data["gain_1"]         = gain_1
+        data["gain_2"]         = gain_2
         data["data_interface"] = data_interface
         data["default_ip"]     = default_ip
 
