@@ -110,8 +110,6 @@ class webInterface():
         self.page_update_rate = 1     
         self._avg_win_size = 10
         self._update_rate_arr = None
-        #self._doa_method   = settings.doa_method_dict[settings.doa_method]
-        #self._doa_fig_type = settings.doa_fig_type_dict[settings.doa_fig_type]
 
         self.sp_data_que = queue.Queue(1) # Que to communicate with the signal processing module
         self.rx_data_que = queue.Queue(1) # Que to communicate with the receiver modules
@@ -120,12 +118,9 @@ class webInterface():
         self.module_receiver = ReceiverRTLSDR(data_que=self.rx_data_que, data_interface=settings.data_interface, logging_level=settings.logging_level*10)
         self.module_receiver.daq_center_freq   = settings.center_freq*10**6
         self.module_receiver.daq_rx_gain       = [settings.gain_1, settings.gain_2]
-        #self.module_receiver.daq_squelch_th_dB = settings.squelch_threshold_dB
         self.module_receiver.rec_ip_addr       = settings.default_ip
 
         self.module_signal_processor = SignalProcessor(data_que=self.sp_data_que, module_receiver=self.module_receiver, logging_level=settings.logging_level*10)        
-        #self.module_signal_processor.DOA_ant_alignment    = settings.ant_arrangement
-        #self.module_signal_processor.DOA_inter_elem_space = settings.ant_spacing
         self.module_signal_processor.en_PR    = settings.en_pr
         self.module_signal_processor.PR_clutter_cancellation = settings.clutter_cancel_algo
         self.module_signal_processor.max_bistatic_range = settings.max_bistatic_range
@@ -135,9 +130,6 @@ class webInterface():
         self.pr_dynamic_range_min = settings.pr_dynrange_min
         self.pr_dynamic_range_max = settings.pr_dynrange_max
 
-        #self.module_signal_processor.en_DOA_FB_avg        = settings.en_fbavg
-        #self.module_signal_processor.en_squelch           = settings.en_squelch
-        #self.config_doa_in_signal_processor()
         self.module_signal_processor.start()
         
         #############################################
@@ -169,15 +161,7 @@ class webInterface():
 
         # DSP Processing Parameters and Results  
         self.spectrum              = None
-        #self.doa_thetas            = None
-        #self.doa_results           = []
-        #self.doa_labels            = []
-        #self.doas                  = [] # Final measured DoAs [deg]
-        #self.doa_confidences       = []
-        #self.compass_ofset         = settings.compass_offset
         self.daq_dsp_latency       = 0 # [ms]
-        #self.max_amplitude         = 0 # Used to help setting the threshold level of the squelch
-        #self.avg_powers            = []
         self.logger.info("Web interface object initialized")        
 
         # Passive Radar Data
@@ -189,12 +173,6 @@ class webInterface():
         self.pathname = ""
         self.reset_doa_graph_flag = False
         self.reset_spectrum_graph_flag = False
-
-        #self.CAFMatrixOld = 0
-        #self.en_persist = True
-        #self.pr_persist_decay = 0.99
-        #self.pr_dynamic_range_min = -20
-        #self.pr_dynamic_range_max = 100
         self.CAFMatrixPersist = None
 
         # Basic DAQ Config
@@ -208,23 +186,12 @@ class webInterface():
             """
             self.module_receiver.M = self.daq_ini_cfg_params[1]
 
-            # Set initial Squelch parameters based on the content of the active config file
-            #if self.daq_ini_cfg_params[5]: # Squelch is enabled
-            #    self.module_signal_processor.en_squelch = True                
-            #    self.module_receiver.daq_squelch_th_dB = -80 #round(20*np.log10(self.daq_ini_cfg_params[6]),1)
-                #self.module_signal_processor.squelch_threshold = self.daq_ini_cfg_params[6]
-                # Note: There is no need to set the thresold in the DAQ Subsystem as it is configured from the ini-file.
-            #else:  # Squelch is disabled
-            #    self.module_signal_processor.en_squelch = False         
-
-
 
     def save_configuration(self):
         data = {}
 
         # DAQ Configuration
         data["center_freq"]    = self.module_receiver.daq_center_freq/10**6
-        #data["uniform_gain"]   = self.module_receiver.daq_rx_gain
         data["gain_1"]   = self.module_receiver.daq_rx_gain[0]
         data["gain_2"]   = self.module_receiver.daq_rx_gain[1]
         data["data_interface"] = settings.data_interface
@@ -240,27 +207,6 @@ class webInterface():
         data["pr_persist_decay"]          = self.pr_persist_decay
         data["pr_dynrange_min"]          = self.pr_dynamic_range_min
         data["pr_dynrange_max"]          = self.pr_dynamic_range_max
-
-
-        #data["ant_arrangement"] = self.module_signal_processor.DOA_ant_alignment
-        #data["ant_spacing"]     = self.module_signal_processor.DOA_inter_elem_space
-        #doa_method = "MUSIC"
-        #for key, val in (settings.doa_method_dict).items():
-        #    if val == self._doa_method:
-        #        doa_method = key
-        #data["doa_method"]      = doa_method
-        #data["en_fbavg"]        = self.module_signal_processor.en_DOA_FB_avg
-        #data["compass_offset"]  = self.compass_ofset
-        #doa_fig_type = "Linear plot"
-        #for key, val in (settings.doa_fig_type_dict).items():
-        #    if val == self._doa_fig_type:
-        #        doa_fig_type = key
-
-        #data["doa_fig_type"]    = doa_fig_type
-
-        # DSP misc
-        #data["en_squelch"]            = self.module_signal_processor.en_squelch
-        #data["squelch_threshold_dB"]  = self.module_receiver.daq_squelch_th_dB
 
         # Web Interface
         data["en_hw_check"]         = settings.en_hw_check
@@ -499,19 +445,13 @@ option = [{"label":"", "value": 1}]
 
 spectrum_fig = go.Figure(layout=fig_layout)
 
-for m in range(0, webInterface_inst.module_receiver.M+1): #+1 for the auto decimation window selection
+for m in range(0, webInterface_inst.module_receiver.M):
     spectrum_fig.add_trace(go.Scattergl(x=x,
                              y=y,
                              name="Channel {:d}".format(m),
                              line = dict(color = trace_colors[m],
                                          width = 2)
                              ))
-
-
-#waterfall_fig = go.Figure(layout=fig_layout)
-#waterfall_fig.add_trace(go.Heatmapgl(
-#                       z=waterfall_init))
-#                       z=[[1,2,3,4,5]]))
 
 
 waterfall_init = [[-80] * webInterface_inst.module_signal_processor.spectrum_window_size] * 50
@@ -545,9 +485,12 @@ waterfall_fig.update_layout(margin=go.layout.Margin(t=5))
 
 
 pr_init = [[-80] * 128] * 128
+y_range = list(range(-128, 128))
+
 pr_fig = go.Figure(layout=fig_layout)
 pr_fig.add_trace(go.Heatmap(
                          z=pr_init,
+                         y=y_range,
                          zsmooth='best', #False,
                          #zsmooth=False, #False,
                          showscale=False,
@@ -571,7 +514,7 @@ pr_fig.add_trace(go.Heatmap(
 
 
 #app = dash.Dash(__name__, suppress_callback_exceptions=True, compress=True, update_title="") # cannot use update_title with dash_devices
-app = dash.Dash(__name__, suppress_callback_exceptions=True, compress=False)
+app = dash.Dash(__name__, suppress_callback_exceptions=True, compress=True)
 
 # app_log = logger.getLogger('werkzeug')
 # app_log.setLevel(settings.logging_level*10)
@@ -594,12 +537,6 @@ app.layout = html.Div([
         interval= 300 * 1000, # Every 5mins TEST
     ),
 
-
-    #dcc.Interval(
-    #    id='interval-component',
-    #    interval=500, # in milliseconds
-    #    n_intervals=0
-    #),
     html.Div(id="placeholder_start"                , style={"display":"none"}),
     html.Div(id="placeholder_stop"                 , style={"display":"none"}),
     html.Div(id="placeholder_save"                 , style={"display":"none"}),
@@ -634,8 +571,6 @@ def generate_config_page_layout(webInterface_inst):
     
     en_persist_values     =[1] if webInterface_inst.en_persist else []
     en_pr_values          =[1] if webInterface_inst.module_signal_processor.en_PR else []
-    #en_fb_avg_values      =[1] if webInterface_inst.module_signal_processor.en_DOA_FB_avg     else []    
-    #en_dsp_squelch_values =[1] if webInterface_inst.module_signal_processor.en_squelch        else []
     
     en_advanced_daq_cfg   =[1] if webInterface_inst.en_advanced_daq_cfg                       else []
     # Calulcate spacings
@@ -684,10 +619,6 @@ def generate_config_page_layout(webInterface_inst):
                 {'label': '48.0 dB', 'value': 48.0},
                 {'label': '49.6 dB', 'value': 49.6},
                 ]
-
-
-    #for preconfig in preconfigs:
-    #    print(preconfig[0])
 
     #-----------------------------
     #   DAQ Configuration Card
@@ -897,9 +828,6 @@ def generate_config_page_layout(webInterface_inst):
     ]
     for i in range(len(daq_subsystem_reconfiguration_options)):
         daq_config_card_list.append(daq_subsystem_reconfiguration_options[i])
-        #else:
-        #    daq_config_card_list.append(html.H2("DAQ Subsystem Reconfiguration", id="init_title_reconfig"))
-        #    daq_config_card_list.append(html.Div("Config file not found! Reconfiguration is not possible !", id="daq_reconfig_note", className="field", style={"color":"red"}))
 
     daq_config_card = html.Div(daq_config_card_list, className="card")
     #-----------------------------
@@ -922,7 +850,6 @@ def generate_config_page_layout(webInterface_inst):
         html.Div([html.Div("Sampling frequency [MHz]:" , id="label_daq_sampling_freq" , className="field-label"), html.Div("- MHz"       , id="body_daq_sampling_freq" , className="field-body")], className="field"),
         html.Div([html.Div("Data block length [ms]:"   , id="label_daq_cpi"           , className="field-label"), html.Div("- ms"        , id="body_daq_cpi"           , className="field-body")], className="field"),
         html.Div([html.Div("IF gains [dB]:"            , id="label_daq_if_gain"       , className="field-label"), html.Div("[,] dB"      , id="body_daq_if_gain"       , className="field-body")], className="field"),
-        #html.Div([html.Div("Avg. powers [dB]:"         , id="label_avg_powers"        , className="field-label"), html.Div("[,] dB"      , id="body_avg_powers"        , className="field-body")], className="field"),
     ], className="card")
 
     #-----------------------------
@@ -1002,7 +929,6 @@ def generate_config_page_layout(webInterface_inst):
         
 spectrum_page_layout = html.Div([   
     html.Div([
-    dcc.Store(id="spectrum-store"),
     dcc.Graph(
         id="spectrum-graph",
         style={'width': '100%', 'height': '45%'},
@@ -1014,25 +940,13 @@ spectrum_page_layout = html.Div([
         figure=waterfall_fig #waterfall fig remains unchanged always due to slow speed to update entire graph #fig_dummy #spectrum_fig #fig_dummy
     ),
 ], className="monitor_card"),
-
-
-    #html.Div([
-    #dcc.Graph(
-    #    style={"height": "inherit"},
-    #    id="waterfall-graph",
-    #    figure=fig_dummy #spectrum_fig #fig_dummy
-    #)], className="monitor_card"),
-
-
-
 ])
+
 def generate_pr_page_layout(webInterface_inst):
     pr_page_layout = html.Div([        
         html.Div([    
-        #dcc.Graph(id='doa-graph-test', figure=doa_fig),
-        dcc.Store(id='pr-store', data=[]),
         dcc.Graph(
-            style={"height": "inherit", "width" : "50%"},
+            style={"height": "inherit", "width" : "100%"},
             id="pr-graph",
             figure=pr_fig, #fig_dummy #doa_fig #fig_dummy
         )], className="monitor_card"),
@@ -1148,25 +1062,12 @@ def fetch_dsp_data():
         pass
         # Handle task here and call q.task_done()
 
-    #current_time = time.time()
-    #time_elapsed = current_time - webInterface_inst.update_time
-    #webInterface_inst.update_time = current_time
-
     if (webInterface_inst.pathname == "/config" or webInterface_inst.pathname == "/") and daq_status_update_flag:
         update_daq_status()
     elif webInterface_inst.pathname == "/spectrum" and spectrum_update_flag:
         plot_spectrum()
     elif (webInterface_inst.pathname == "/pr" and doa_update_flag): #or (webInterface_inst.pathname == "/doa" and webInterface_inst.reset_doa_graph_flag):
         plot_pr()
-
-    #if (pathname == "/config" or pathname=="/") and daq_status_update_flag:        
-    #    pass
-    #elif pathname == "/spectrum" and spectrum_update_flag:
-    #    pass
-    #elif pathname == "/doa" and doa_update_flag:
-    #    pass
-    #else:
-    #    pass
 
     webInterface_inst.dsp_timer = Timer(.01, fetch_dsp_data)
     webInterface_inst.dsp_timer.start()
@@ -1251,8 +1152,6 @@ def update_daq_status():
     daq_rf_center_freq_str = str(webInterface_inst.daq_center_freq)
     daq_sampling_freq_str  = str(webInterface_inst.daq_fs)
     daq_cpi_str            = str(webInterface_inst.daq_cpi)
-    #daq_max_amp_str        = "{:.1f}".format(webInterface_inst.max_amplitude)
-    #daq_avg_powers_str     = webInterface_inst.avg_powers
 
 
     app.push_mods({
@@ -1270,7 +1169,6 @@ def update_daq_status():
            'body_daq_sampling_freq': {'children': daq_sampling_freq_str},
            'body_daq_cpi': {'children': daq_cpi_str},
            'body_daq_if_gain': {'children': webInterface_inst.daq_if_gains},
-           #'body_avg_powers': {'children': daq_avg_powers_str}
     })
 
     app.push_mods({
@@ -1291,8 +1189,6 @@ def update_daq_status():
     State(component_id ="daq_rx_gain_2"           , component_property='value')],
 )
 def update_daq_params(input_value, f0, gain, gain_2):
-    #if input_value is None:
-    #    raise PreventUpdate
     webInterface_inst.daq_center_freq = f0
     webInterface_inst.config_daq_rf(f0, [gain, gain_2] ) # CARL: TO CHANGE THIS TO AUTO POPULATE EACH GAIN UP TO M RECEIVERS?
     return 1
@@ -1315,22 +1211,12 @@ def display_page(pathname):
         return [generate_config_page_layout(webInterface_inst), "header_active", "header_inactive", "header_inactive"]
     elif pathname == "/spectrum":
         webInterface_inst.module_signal_processor.en_spectrum = True
-        #webInterface_inst.reset_spectrum_graph_flag = True
-        #plot_spectrum()
-        #while webInterface_inst.reset_spectrum_graph_flag: time.sleep(1)
         spectrum_fig = None # Force reload of graphs as axes may change etc
         time.sleep(1)
         return [spectrum_page_layout, "header_inactive", "header_active", "header_inactive"]
     elif pathname == "/pr":
         webInterface_inst.module_signal_processor.en_spectrum = False
-        #webInterface_inst.module_signal_processor.en_DOA_estimation = False 
-        #webInterface_inst.reset_doa_graph_flag = True
         plot_pr()
-        #doa_fig = {}
-        #while webInterface_inst.reset_doa_graph_flag: time.sleep(1) # Wait until the graph is reset
-        #while doa_fig == None : time.sleep(0.1) # Wait for doa_fig to reconfigure in timer callback
-        #time.sleep(1)
-        #webInterface_inst.module_signal_processor.en_DOA_estimation = True
         return [generate_pr_page_layout(webInterface_inst), "header_inactive", "header_inactive", "header_active"]
     return Output('dummy_output', 'children', '') #[no_update, no_update, no_update, no_update]
 
@@ -1361,62 +1247,10 @@ def save_config_btn(input_value):
     webInterface_inst.logger.info("Saving DAQ and DSP Configuration")
     webInterface_inst.save_configuration()
 
-"""
-@app.callback(
-    #Output(component_id='url', component_property='pathname'),
-    None,
-    [Input(component_id='mem_leak_refresh_interval', component_property='n_intervals')],
-    [State(component_id='url', component_property='pathname')]
-)
-def heatmap_mem_leak_refresh_fix(intervals, pathname):
-    if pathname == "/doa":
-
-        CAFMatrix = np.abs(webInterface_inst.RD_matrix)
-
-        CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
-        CAFMatrixLog = 20 * np.log10(CAFMatrix)
-
-        CAFDynRange = 20
-        CAFMatrixLog[CAFMatrixLog < -CAFDynRange] = -CAFDynRange
-
-
-        pr_init = CAFMatrixLog
-        pr_fig = go.Figure(layout=fig_layout)
-        pr_fig.add_trace(go.Heatmap(
-                         z=pr_init,
-                         zsmooth='best', #False,
-                         #zsmooth=False, #False,
-                         showscale=False,
-                         hoverinfo='skip',
-                         colorscale=[[0.0, '#000020'],
-                         [0.0714, '#000030'],
-                         [0.1428, '#000050'],
-                         [0.2142, '#000091'],
-                         [0.2856, '#1E90FF'],
-                         [0.357, '#FFFFFF'],
-                         [0.4284, '#FFFF00'],
-                         [0.4998, '#FE6D16'],
-                         [0.5712, '#FE6D16'],
-                         [0.6426, '#FF0000'],
-                         [0.714, '#FF0000'],
-                         [0.7854, '#C60000'],
-                         [0.8568, '#9F0000'],
-                         [0.9282, '#750000'],
-                         [1.0, '#4A0000']]))
-
-        app.push_mods({
-               'pr-graph': {'figure': pr_fig},
-               #'pr-graph': {'extendData': pr_fig},
-        #       'waterfall-graph': {'figure': waterfall_fig}
-        })
-"""
-
 def plot_pr():
     global pr_fig
 
     if webInterface_inst.RD_matrix is not None:
-
-        #start = time.time()
 
         CAFMatrix = np.abs(webInterface_inst.RD_matrix)
 
@@ -1427,10 +1261,6 @@ def plot_pr():
         else:
             webInterface_inst.CAFMatrixPersist = np.maximum(webInterface_inst.CAFMatrixPersist, CAFMatrix)*webInterface_inst.pr_persist_decay #webInterface_inst.CAFMatrixPersist * 0.5 + CAFMatrix * 0.5
 
-        #CAFMatrixNew = #np.maximum(webInterface_inst.CAFMatrixOld, CAFMatrix)
-        #webInterface_inst.CAFMatrixOld = CAFMatrixNew
-        #webInterface_inst.CAFMatrixOld = webInterface_inst.CAFMatrixOld * 0.999
-
         CAFMatrixLog = 20 * np.log10(webInterface_inst.CAFMatrixPersist)
 
         CAFDynRange = webInterface_inst.pr_dynamic_range_min
@@ -1439,63 +1269,29 @@ def plot_pr():
         CAFDynRange = webInterface_inst.pr_dynamic_range_max
         CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
 
-        #end = time.time()
-        #print("WebInt Time: " + str((end-start)* 1000))
+        y_height = CAFMatrixLog.shape[0]
+        y_range = list(np.arange(-y_height/2, y_height/2))
 
         app.push_mods({
-            #'pr-store': {'data': CAFMatrixLog}
-            'pr-graph': {'extendData': [dict(z =[CAFMatrixLog]), [0], len(CAFMatrixLog)]}
+            'pr-graph': {'extendData': [dict(z = [CAFMatrixLog], y = [y_range]), [0], len(CAFMatrixLog)]}
         })
-
-
-#app.clientside_callback(
-#    """
-#    function (data) {
-#        /*return [{x: data.map(i => i.x), y: data.map(i => i.y)}, [...Array(data.length).keys()], data[0].x.length]*/
-#
-#        /*const every_nth = (arr, nth) => arr.filter((e, i) => i % nth === (nth | 0) - 1);*/
-#
-#        return [
-#                [{x: data.map(i => i.x), y: data.map(i => i.y)}, [...Array(data.length).keys()], data[0].x.length],
-#                /*[{z: [[every_nth(data[0].y, 1)]]}, [0], 50]*/
-#                [{z: [[data[0].y]]}, [0], 50]
-#               ]
-#    }
-#    """,
-#    [Output('spectrum-graph', 'extendData'),
-#    Output('waterfall-graph', 'extendData')],
-#    [Input('spectrum-store', 'data')]
-#)
 
 def plot_spectrum():
     global spectrum_fig
     global waterfall_fig
     if spectrum_fig == None:
-    #if webInterface_inst.reset_spectrum_graph_flag:
         spectrum_fig = go.Figure(layout=fig_layout)
-        #freq_label="Frequency [MHz]"
 
         x=webInterface_inst.spectrum[0,:] + webInterface_inst.daq_center_freq*10**6
 
         # Plot traces
-        for m in range(np.size(webInterface_inst.spectrum, 0)-2):
+        for m in range(np.size(webInterface_inst.spectrum, 0)-1):
             spectrum_fig.add_trace(go.Scattergl(x=x,
                                      y=y, #webInterface_inst.spectrum[m+1, :],
                                      name="Channel {:d}".format(m),
                                      line = dict(color = trace_colors[m],
                                                  width = 1)
                                     ))
-
-        spectrum_fig.add_hline(y=webInterface_inst.module_receiver.daq_squelch_th_dB)
-
-        # Add selected window plot
-        m = np.size(webInterface_inst.spectrum,0)-1
-        spectrum_fig.add_trace(go.Scattergl(x=x,
-                             y=y, #webInterface_inst.spectrum[m, :],
-                             name="Selected Signal Window",
-                             line = dict(color = trace_colors[m],
-                                         width = 3)
-                             ))
 
         spectrum_fig.update_xaxes( #title_text=freq_label,
                     color='rgba(255,255,255,1)',
@@ -1538,21 +1334,12 @@ def plot_spectrum():
         update_data = dict(x=x_app, y=y_app)
 
         app.push_mods({
-            #'spectrum-graph': {'extendData': [update_data, [0, 1, 2], len(webInterface_inst.spectrum[0,:])]},
             'spectrum-graph': {'extendData': [update_data, list(range(0,len(webInterface_inst.spectrum)-1)), len(webInterface_inst.spectrum[0,:])]},
             'waterfall-graph': {'extendData': [dict(z =[[webInterface_inst.spectrum[1, :]]]), [0], 50]}
-
-#           'spectrum-store': {'data': update_data}
-           #'spectrum-graph': {'extendData': spec},
-           #'waterfall-graph': {'extendData': waterfall}
         })
 
 
 @app.callback(
-    #[Output(component_id="body_ant_spacing_wavelength",  component_property='children')],
-    #Output(component_id="label_ant_spacing_meter",  component_property='children')],
-    #Output(component_id="ambiguity_warning",  component_property='children'),
-    #Output(component_id="en_fb_avg_check",  component_property="options")],
     None,
     [Input(component_id ="placeholder_update_freq"       , component_property='children'),
     Input(component_id ="en_pr_check"       , component_property='value'),
@@ -1564,7 +1351,6 @@ def plot_spectrum():
     Input(component_id ="dynrange_max"           , component_property='value'),
     Input(component_id ="dynrange_min"           , component_property='value')]
 )
-#def update_dsp_params(freq_update, en_doa, en_fb_avg, spacing_meter, ant_arrangement, doa_fig_type, doa_method, compass_ofset): #, input_value):
 def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistatic_range, max_doppler, clutter_cancel_algo, dynrange_max, dynrange_min): #, input_value):
 
     if en_pr is not None and len(en_pr):
@@ -1578,17 +1364,12 @@ def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistati
     else:
         webInterface_inst.en_persist = False
 
-    #webInterface_inst.module_signal_processor.DOA_ant_alignment=ant_arrangement
     webInterface_inst.module_signal_processor.PR_clutter_cancellation = clutter_cancel_algo
     webInterface_inst.module_signal_processor.max_bistatic_range = max_bistatic_range
     webInterface_inst.module_signal_processor.max_doppler = max_doppler
     webInterface_inst.pr_persist_decay = persist_decay
     webInterface_inst.pr_dynamic_range_min = dynrange_min
     webInterface_inst.pr_dynamic_range_max = dynrange_max
-    #webInterface_inst._doa_fig_type = doa_fig_type
-    #webInterface_inst.compass_ofset = compass_ofset
-
-    #return [str(ant_spacing_wavelength)]
 
 @app.callback(
     None,
@@ -1796,21 +1577,8 @@ def toggle_adv_daq(toggle_value):
               Input("placeholder_update_rx" , "children")]
 )
 def reload_cfg_page(config_fname, dummy_0, dummy_1):
-    #ctx = dash.callback_context
     webInterface_inst.daq_ini_cfg_params = read_config_file(config_fname)
     webInterface_inst.tmp_daq_ini_cfg = webInterface_inst.daq_ini_cfg_params[0]
-
-    #if ctx.triggered:
-    #    component_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        #if component_id  == "daq_cfg_files" and config_fname is not None:
-        #    webInterface_inst.daq_ini_cfg_params = read_config_file(config_fname)
-        #    webInterface_inst.tmp_daq_ini_cfg = webInterface_inst.daq_ini_cfg_params[0]
-        #elif component_id == "en_advanced_daq_cfg":
-        #if component_id == "en_advanced_daq_cfg":
-        #    if en_advanced_daq_cfg is not None and len(en_advanced_daq_cfg):
-        #        webInterface_inst.en_advanced_daq_cfg = True
-        #    else:
-        #        webInterface_inst.en_advanced_daq_cfg = False
     return ["/config"]
 
 @app.callback(
@@ -1870,7 +1638,6 @@ def reconfig_daq_chain(input_value, freq, gain):
         return [-1]
 
     # Reset channel number count
-#    webInterface_inst.module_receiver.M = 0
     webInterface_inst.module_signal_processor.first_frame = 1
 
 
@@ -1879,39 +1646,17 @@ def reconfig_daq_chain(input_value, freq, gain):
     webInterface_inst.logger.debug("Signal processing started")
     webInterface_inst.daq_restart = 0
 
-
-    # Gain is always reset to zero, need to set gains to what is in the web interface
-    #webInterface_inst.config_daq_rf(freq,gain)
-
-
-    # Set local Squelch-DSP parameters
-    #if webInterface_inst.daq_ini_cfg_params[5]: # Squelch is enabled
-    #    webInterface_inst.module_signal_processor.en_squelch = True
-    #    webInterface_inst.module_receiver.daq_squelch_th_dB = -80 #round(20*np.log10(webInterface_inst.daq_ini_cfg_params[6]),1)
-
-        #webInterface_inst.module_signal_processor.squelch_threshold = webInterface_inst.daq_ini_cfg_params[6]
-        # Note: There is no need to set the thresold in the DAQ Subsystem as it is configured from the ini-file.
-    #else:  # Squelch is disabled
-    #    webInterface_inst.module_signal_processor.en_squelch = False
-
-    # Set number of channels
-    # Reset first_frame on signal processor so new channel count is read
-    #webInterface_inst.module_signal_processor.channel_number = webInterface_inst.daq_ini_cfg_params[1]
-
     webInterface_inst.daq_cfg_ini_error = ""
     webInterface_inst.active_daq_ini_cfg = webInterface_inst.daq_ini_cfg_params[0] #webInterface_inst.tmp_daq_ini_cfg
 
 
     return Output("daq_cfg_files", "value", daq_config_filename), Output("active_daq_ini_cfg", "children", "Active Configuration: " + webInterface_inst.active_daq_ini_cfg)
 
-    #return Output("placeholder_recofnig_daq", "children", '1')
-#    return [0]
-
 
 if __name__ == "__main__":    
     # For Development only, otherwise use gunicorn    
     # Debug mode does not work when the data interface is set to shared-memory "shmem"! 
-    app.run_server(debug=False, host="0.0.0.0")
+    app.run_server(debug=False, host="0.0.0.0", port=8080)
     #waitress #serve(app.server, host="0.0.0.0", port=8050)
 
 """

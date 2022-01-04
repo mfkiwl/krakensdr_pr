@@ -177,7 +177,7 @@ class SignalProcessor(threading.Thread):
                 if self.first_frame:
                     self.channel_number = self.module_receiver.iq_header.active_ant_chs
                     self.spectrum_upd_counter = 0
-                    self.spectrum = np.ones((self.channel_number+2, self.spectrum_window_size), dtype=np.float32)
+                    self.spectrum = np.ones((self.channel_number+1, self.spectrum_window_size), dtype=np.float32)
                     self.first_frame = 0
 
                 decimation_factor = 1
