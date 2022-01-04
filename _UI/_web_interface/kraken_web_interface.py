@@ -1538,7 +1538,8 @@ def plot_spectrum():
         update_data = dict(x=x_app, y=y_app)
 
         app.push_mods({
-            'spectrum-graph': {'extendData': [update_data, [0, 1, 2], len(webInterface_inst.spectrum[0,:])]},
+            #'spectrum-graph': {'extendData': [update_data, [0, 1, 2], len(webInterface_inst.spectrum[0,:])]},
+            'spectrum-graph': {'extendData': [update_data, list(range(0,len(webInterface_inst.spectrum)-1)), len(webInterface_inst.spectrum[0,:])]},
             'waterfall-graph': {'extendData': [dict(z =[[webInterface_inst.spectrum[1, :]]]), [0], 50]}
 
 #           'spectrum-store': {'data': update_data}
