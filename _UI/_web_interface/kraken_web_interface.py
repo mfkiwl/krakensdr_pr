@@ -1032,7 +1032,7 @@ def generate_pr_page_layout(webInterface_inst):
         #dcc.Graph(id='doa-graph-test', figure=doa_fig),
         dcc.Store(id='pr-store', data=[]),
         dcc.Graph(
-            style={"height": "inherit"},
+            style={"height": "inherit", "width" : "50%"},
             id="pr-graph",
             figure=pr_fig, #fig_dummy #doa_fig #fig_dummy
         )], className="monitor_card"),
@@ -1448,39 +1448,24 @@ def plot_pr():
         })
 
 
-# DOA Graph Clientside Callback
 #app.clientside_callback(
 #    """
-#    function (data, graph_type) {
-#        return [
-#                   [{z: [data]}, [0], data.length]
-#               ]
+#    function (data) {
+#        /*return [{x: data.map(i => i.x), y: data.map(i => i.y)}, [...Array(data.length).keys()], data[0].x.length]*/
 #
+#        /*const every_nth = (arr, nth) => arr.filter((e, i) => i % nth === (nth | 0) - 1);*/
+#
+#        return [
+#                [{x: data.map(i => i.x), y: data.map(i => i.y)}, [...Array(data.length).keys()], data[0].x.length],
+#                /*[{z: [[every_nth(data[0].y, 1)]]}, [0], 50]*/
+#                [{z: [[data[0].y]]}, [0], 50]
+#               ]
 #    }
 #    """,
-#    [Output('pr-graph', 'extendData')],
-#    [Input('pr-store', 'data')]
+#    [Output('spectrum-graph', 'extendData'),
+#    Output('waterfall-graph', 'extendData')],
+#    [Input('spectrum-store', 'data')]
 #)
-
-
-app.clientside_callback(
-    """
-    function (data) {
-        /*return [{x: data.map(i => i.x), y: data.map(i => i.y)}, [...Array(data.length).keys()], data[0].x.length]*/
-
-        /*const every_nth = (arr, nth) => arr.filter((e, i) => i % nth === (nth | 0) - 1);*/
-
-        return [
-                [{x: data.map(i => i.x), y: data.map(i => i.y)}, [...Array(data.length).keys()], data[0].x.length],
-                /*[{z: [[every_nth(data[0].y, 1)]]}, [0], 50]*/
-                [{z: [[data[0].y]]}, [0], 50]
-               ]
-    }
-    """,
-    [Output('spectrum-graph', 'extendData'),
-    Output('waterfall-graph', 'extendData')],
-    [Input('spectrum-store', 'data')]
-)
 
 def plot_spectrum():
     global spectrum_fig
@@ -1542,11 +1527,21 @@ def plot_spectrum():
     else:
         update_data = []
         for m in range(1, np.size(webInterface_inst.spectrum, 0)): #webInterface_inst.module_receiver.M+1):
-            #update_data.append(dict(x=webInterface_inst.spectrum[0,:], y=webInterface_inst.spectrum[m, :]))
             update_data.append(dict(x=webInterface_inst.spectrum[0,:] + webInterface_inst.daq_center_freq*10**6, y=webInterface_inst.spectrum[m, :]))
 
+        x_app = []
+        y_app = []
+        for m in range(1, np.size(webInterface_inst.spectrum, 0)): #webInterface_inst.module_receiver.M+1):
+            x_app.append(webInterface_inst.spectrum[0,:] + webInterface_inst.daq_center_freq*10**6)
+            y_app.append(webInterface_inst.spectrum[m, :])
+
+        update_data = dict(x=x_app, y=y_app)
+
         app.push_mods({
-           'spectrum-store': {'data': update_data}
+            'spectrum-graph': {'extendData': [update_data, [0, 1, 2], len(webInterface_inst.spectrum[0,:])]},
+            'waterfall-graph': {'extendData': [dict(z =[[webInterface_inst.spectrum[1, :]]]), [0], 50]}
+
+#           'spectrum-store': {'data': update_data}
            #'spectrum-graph': {'extendData': spec},
            #'waterfall-graph': {'extendData': waterfall}
         })
