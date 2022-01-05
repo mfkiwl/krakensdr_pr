@@ -71,6 +71,8 @@ Make sure to set an appropriate passive radar config ini for the Heimdall DAQ. (
 
 ### Remote operation
 
+*UNTESTED*
+
 1. Start the DAQ Subsystem either remotely. (Make sure that the *daq_chain_config.ini* contains the proper configuration) 
     (See:https://github.com/krakenrf/heimdall_daq_fw/Documentation)
 2. Set the IP address of the DAQ Subsystem in the settings.json, *default_ip* field.
@@ -79,4 +81,4 @@ Make sure to set an appropriate passive radar config ini for the Heimdall DAQ. (
 4. To stop the server and the DSP processing chain run the following script:
 `./kill.sh`
 
-<p1> After starting the script a web based server opens at port number 8051, which then can be accessed by typing "KRAKEN_IP:8080/" in the address bar of any web browser. You can find the IP address of the KrakenSDR Pi4 wither via your routers WiFi management page, or by typing "ip addr" into the terminal. You can also use the hostname of the Pi4 in place of the IP address, but this only works on local networks, and not the internet, or mobile hotspot networks. </p1>
+<p1> After starting the script a web based server opens at port number 8088, which then can be accessed by typing "KRAKEN_IP:8080/" in the address bar of any web browser. You can find the IP address of the KrakenSDR Pi4 wither via your routers WiFi management page, or by typing "ip addr" into the terminal. You can also use the hostname of the Pi4 in place of the IP address, but this only works on local networks, and not the internet, or mobile hotspot networks. </p1>
