@@ -14,6 +14,6 @@ echo "Starting KrakenSDR Passive Radar"
 python3 _UI/_web_interface/kraken_web_interface.py 2> ui.log &
 
 # Start PHP webserver to interface with Android devices
-#echo "Python Server running at $IPADDR:8050"
+#echo "Python Server running at $IPADDR:8080"
 #echo "PHP Server running at $IPADDR:$IPPORT"
 #sudo php -S $IPADDR:$IPPORT -t _android_web 2> /dev/null &
