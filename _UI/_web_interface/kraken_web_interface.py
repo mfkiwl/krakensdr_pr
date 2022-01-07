@@ -1655,6 +1655,8 @@ def reconfig_daq_chain(input_value, freq, gain):
     else:
         webInterface_inst.logger.info("DAQ Subsystem configuration file edited")
 
+    time.sleep(2)
+
     webInterface_inst.daq_restart = 1
     
     #    Restart DAQ Subsystem
