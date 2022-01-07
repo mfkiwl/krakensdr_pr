@@ -1696,6 +1696,8 @@ def reconfig_daq_chain(input_value, freq, gain):
     webInterface_inst.logger.debug("Signal processing started")
     webInterface_inst.daq_restart = 0
 
+    webInterface_inst.module_receiver.iq_header.active_ant_chs = webInterface_inst.daq_ini_cfg_params[1]
+
     webInterface_inst.daq_cfg_ini_error = ""
     webInterface_inst.active_daq_ini_cfg = webInterface_inst.daq_ini_cfg_params[0] #webInterface_inst.tmp_daq_ini_cfg
 
