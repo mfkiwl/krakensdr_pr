@@ -341,6 +341,7 @@ def write_config_file(param_list):
     parser['daq']['daq_buffer_size']=str(param_list[2])
     parser['daq']['sample_rate']=str(param_list[3])
     parser['daq']['en_noise_source_ctr']=str(param_list[4])
+    parser['daq']['center_freq']=str(int(webInterface_inst.module_receiver.daq_center_freq))
 
     parser['squelch']['en_squelch']=str(param_list[5])
     parser['squelch']['amplitude_threshold']=str(param_list[6])
@@ -1655,7 +1656,7 @@ def reconfig_daq_chain(input_value, freq, gain):
     else:
         webInterface_inst.logger.info("DAQ Subsystem configuration file edited")
 
-    time.sleep(2)
+#    time.sleep(2)
 
     webInterface_inst.daq_restart = 1
     
@@ -1663,7 +1664,7 @@ def reconfig_daq_chain(input_value, freq, gain):
     
     # Stop signal processing
     webInterface_inst.stop_processing()
-    time.sleep(2)
+ #   time.sleep(2)
     webInterface_inst.logger.debug("Signal processing stopped")
 
     # Close control and IQ data interfaces
@@ -1684,14 +1685,47 @@ def reconfig_daq_chain(input_value, freq, gain):
     os.chdir(root_path)
 
     # Reinitialize receiver data interface
-    if webInterface_inst.module_receiver.init_data_iface() == -1:
-        webInterface_inst.logger.critical("Failed to restart the DAQ data interface")
-        webInterface_inst.daq_cfg_ini_error = "Failed to restart the DAQ data interface"
-        return [-1]
+    #if webInterface_inst.module_receiver.init_data_iface() == -1:
+    #    webInterface_inst.logger.critical("Failed to restart the DAQ data interface")
+    #    webInterface_inst.daq_cfg_ini_error = "Failed to restart the DAQ data interface"
+    #    return [-1]
 
     # Reset channel number count
-    webInterface_inst.module_signal_processor.first_frame = 1
+    #webInterface_inst.module_signal_processor.first_frame = 1
 
+    en_PR    = webInterface_inst.module_signal_processor.en_PR
+    PR_clutter_cancellation = webInterface_inst.module_signal_processor.PR_clutter_cancellation
+    max_bistatic_range = webInterface_inst.module_signal_processor.max_bistatic_range
+    max_doppler = webInterface_inst.module_signal_processor.max_doppler
+    en_persist = webInterface_inst.en_persist
+    pr_persist_decay = webInterface_inst.pr_persist_decay
+    pr_dynamic_range_min = webInterface_inst.pr_dynamic_range_min
+    pr_dynamic_range_max = webInterface_inst.pr_dynamic_range_max
+
+    # Recreate and reinit the receiver and signal processor modules from scratch, keeping current setting values
+    daq_center_freq = webInterface_inst.module_receiver.daq_center_freq
+    daq_rx_gain = webInterface_inst.module_receiver.daq_rx_gain
+    rec_ip_addr = webInterface_inst.module_receiver.rec_ip_addr
+
+    webInterface_inst.module_receiver = ReceiverRTLSDR(data_que=webInterface_inst.rx_data_que, data_interface=settings.data_interface, logging_level=settings.logging_level*10)
+    webInterface_inst.module_receiver.daq_center_freq   = daq_center_freq
+    webInterface_inst.module_receiver.daq_rx_gain       = daq_rx_gain #settings.uniform_gain #daq_rx_gain
+    webInterface_inst.module_receiver.rec_ip_addr       = rec_ip_addr
+
+    webInterface_inst.module_signal_processor = SignalProcessor(data_que=webInterface_inst.sp_data_que, module_receiver=webInterface_inst.module_receiver, logging_level=settings.logging_level*10)
+    webInterface_inst.module_signal_processor.en_PR    = en_PR
+    webInterface_inst.module_signal_processor.PR_clutter_cancellation = PR_clutter_cancellation
+    webInterface_inst.module_signal_processor.max_bistatic_range = max_bistatic_range
+    webInterface_inst.module_signal_processor.max_doppler = max_doppler
+    webInterface_inst.en_persist = en_persist
+    webInterface_inst.pr_persist_decay = pr_persist_decay
+    webInterface_inst.pr_dynamic_range_min = pr_dynamic_range_min
+    webInterface_inst.pr_dynamic_range_max = pr_dynamic_range_max
+
+    webInterface_inst.module_signal_processor.start()
+
+    # This must be here, otherwise the gains dont reinit properly?
+    webInterface_inst.module_receiver.M = webInterface_inst.daq_ini_cfg_params[1]
 
     # Restart signal processing
     webInterface_inst.start_processing()
