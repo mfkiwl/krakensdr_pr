@@ -228,7 +228,6 @@ class SignalProcessor(threading.Thread):
 
                         spectrum_samples = self.module_receiver.iq_samples #spectrum_signal #self.processed_signal #self.module_receiver.iq_samples #self.processed_signal
 
-
                         N = self.spectrum_window_size
 
                         N_perseg = 0
@@ -287,7 +286,7 @@ class SignalProcessor(threading.Thread):
                         RD_matrix = cc_detector_ons(ref_ch, surv_ch, self.module_receiver.iq_header.sampling_freq, max_Doppler, max_range)
 
                         end = time.time()
-                        print("Time: " + str((end-start) * 1000))
+                        #print("Time: " + str((end-start) * 1000))
 
                         que_data_packet.append(['RD_matrix', RD_matrix])
 
@@ -421,8 +420,8 @@ def pruned_correlation(ref_ch, surv_ch, clen, N):
     ypp = np.vstack([xp[1:, :], np.zeros(cols, dtype=c_dtype)]) #vstack appears to be faster than pad
     yp = np.concatenate([xp, ypp], axis=1)
 
-    print("pruned corr xp shape: " + str(xp.shape))
-    print("pruned corr yp shape: " + str(yp.shape))
+    #print("pruned corr xp shape: " + str(xp.shape))
+    #print("pruned corr yp shape: " + str(yp.shape))
 
     # execute FFT on the matrices
     xpw = fft.fft(xp, n = 2*cols, axis=1, workers=4, overwrite_x=True)
@@ -526,8 +525,8 @@ def cc_detector_ons(ref_ch, surv_ch, fs, fD_max, r_max):
 
     ref_ch_align, surv_ch_align = resize_and_align(no_sub_tasks, ref_ch, surv_ch, fs, fD_max, r_max)
 
-    print("ref_ch_align shape: " + str(ref_ch_align.shape))
-    print("surv_ch_align shape: " + str(surv_ch_align.shape))
+    #print("ref_ch_align shape: " + str(ref_ch_align.shape))
+    #print("surv_ch_align shape: " + str(surv_ch_align.shape))
 
 
     # row wise fft on both channels
