@@ -141,15 +141,16 @@ class SignalProcessor(threading.Thread):
         self.spectrum = None #np.ones((self.channel_number+2,N), dtype=np.float32)
         self.spectrum_upd_counter = 0
 
-
     def run(self):
         """
             Main processing thread        
         """
 
         pyfftw.config.NUM_THREADS = 4
+        pyfftw.config.PLANNER_EFFORT = "FFTW_MEASURE" #"FFTW_PATIENT"
         scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
         pyfftw.interfaces.cache.enable()
+
 
         while True:
             self.is_running = False
@@ -271,13 +272,17 @@ class SignalProcessor(threading.Thread):
 
                         td_filter_dimension = self.max_bistatic_range
 
+
                         start = time.time()
 
                         if self.PR_clutter_cancellation == "Wiener MRE":
                             surv_ch, w = Wiener_SMI_MRE(ref_ch, surv_ch, td_filter_dimension)
                             #surv_ch, w = cc.Wiener_SMI_MRE(ref_ch, surv_ch, td_filter_dimension)
 
-                        surv_ch = det.windowing(surv_ch, "Hamming") #surv_ch * signal.tukey(surv_ch.size, alpha=0.25) #det.windowing(surv_ch, "hamming")
+                        end = time.time()
+                        print("Time: " + str((end-start) * 1000))
+
+                        surv_ch = numba_mult(surv_ch, get_window(surv_ch.size)) #surv_ch * get_window(surv_ch.size) #det.windowing(surv_ch, "Hamming") #surv_ch * signal.tukey(surv_ch.size, alpha=0.25) #det.windowing(surv_ch, "hamming")
 
                         max_Doppler = self.max_doppler #256
                         max_range = self.max_bistatic_range
@@ -285,8 +290,6 @@ class SignalProcessor(threading.Thread):
                         #RD_matrix = det.cc_detector_ons(ref_ch, surv_ch, self.module_receiver.iq_header.sampling_freq, max_Doppler, max_range, verbose=0, Qt_obj=None)
                         RD_matrix = cc_detector_ons(ref_ch, surv_ch, self.module_receiver.iq_header.sampling_freq, max_Doppler, max_range)
 
-                        end = time.time()
-                        #print("Time: " + str((end-start) * 1000))
 
                         que_data_packet.append(['RD_matrix', RD_matrix])
 
@@ -322,6 +325,10 @@ class SignalProcessor(threading.Thread):
                 thetime = ((end - start) * 1000)
                 print ("Time elapsed: ", thetime)
                 """
+@njit(fastmath=True, parallel=True, cache=True)
+def numba_mult(a,b):
+    return a * b
+
 @jit(fastmath=True)
 def Wiener_SMI_MRE(ref_ch, surv_ch, K):
     """
@@ -360,7 +367,7 @@ def Wiener_SMI_MRE(ref_ch, surv_ch, K):
 def fast_w(R, r, K, R_mult):
     # Complete the R matrix based on its Hermitian and Toeplitz property
 
-    for k in range(1, K):
+    for k in nb.prange(1, K):
         R[:, k] = shift(R[:, 0], k)
     #R[:, K] = shift(R[:,0], K)
 
@@ -372,6 +379,10 @@ def fast_w(R, r, K, R_mult):
     # inverse and dot product run time : 1.1s for 2048*2048 matrix
 
     return w
+
+@lru_cache(maxsize=2)
+def get_window(size):
+    return signal.hamming(size)
 
 #Memoize ~50ms speedup?
 @lru_cache(maxsize=2)
@@ -500,7 +511,7 @@ def resize_and_align(no_sub_tasks, ref_ch, surv_ch, fs, fD_max, r_max):
 def corr_mult(surv_fft, ref_fft):
     return np.multiply(surv_fft, ref_fft.conj())
 
-@jit(fastmath=True, cache=True)
+#@jit(fastmath=True, cache=True)
 def cc_detector_ons(ref_ch, surv_ch, fs, fD_max, r_max):
     """
     Parameters:
@@ -528,7 +539,6 @@ def cc_detector_ons(ref_ch, surv_ch, fs, fD_max, r_max):
     #print("ref_ch_align shape: " + str(ref_ch_align.shape))
     #print("surv_ch_align shape: " + str(surv_ch_align.shape))
 
-
     # row wise fft on both channels
     ref_fft = fft.fft(ref_ch_align, axis = 1, overwrite_x=True, workers=4) #pyfftw.interfaces.numpy_fft.fft(ref_ch_align_a, axis = 1, overwrite_input=True, threads=4) #fft.fft(ref_ch_align_a, axis = 1, overwrite_x=True, workers=4)
     surv_fft = fft.fft(surv_ch_align, axis = 1, overwrite_x=True, workers=4) #pyfftw.interfaces.numpy_fft.fft(surv_ch_align_a, axis = 1, overwrite_input=True, threads=4) #fft.fft(surv_ch_align_a, axis = 1, overwrite_x=True, workers=4)
@@ -540,7 +550,8 @@ def cc_detector_ons(ref_ch, surv_ch, fs, fD_max, r_max):
     corr_a = pyfftw.empty_aligned(np.shape(corr), dtype=c_dtype)
     corr_a[:] = corr #.copy()
 
-    # This is the most computationally intensive part ~120ms, overwrite_x=True gives a big speedup, not sure if it changes the result though...
+    #with scipy.fft.set_backend(pyfftw.interfaces.scipy_fft):
+        # This is the most computationally intensive part ~120ms, overwrite_x=True gives a big speedup, not sure if it changes the result though...
     corr = fft.fft(corr_a, n=2* no_sub_tasks,  axis = 0, workers=4, overwrite_x=True) # Setting the output size with "n=.." is faster than doing a concat first.
 
     # crop and fft shift
