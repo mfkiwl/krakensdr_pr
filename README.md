@@ -39,6 +39,7 @@ pip3 install cython
 pip3 install pyfftw
 
 conda install dash==1.20.0
+conda install werkzeug==2.0.2
 ```
 
 4. Install the krakensdr_pr software
@@ -47,7 +48,6 @@ conda install dash==1.20.0
 cd ~/krakensdr
 git clone https://github.com/krakenrf/krakensdr_pr
 cd krakensdr_pr
-git checkout development
 ```
 
 Copy the the *krakensdr_doa/util/kraken_doa_start.sh* and the *krakensdr_doa/util/kraken_doa_stop.sh* scripts into the krakensdr root folder of the project.
