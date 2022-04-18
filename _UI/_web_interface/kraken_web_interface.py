@@ -114,7 +114,6 @@ class webInterface():
         self.module_receiver = ReceiverRTLSDR(data_que=self.rx_data_que, data_interface=self.data_interface, logging_level=self.logging_level)
         self.module_receiver.daq_center_freq   = dsp_settings.get("center_freq", 100.0) * 10**6
         self.module_receiver.daq_rx_gain       = [float(dsp_settings.get("gain_1", 1.4)), float(dsp_settings.get("gain_2", 1.4))]
-        self.module_receiver.daq_squelch_th_dB = dsp_settings.get("squelch_threshold_dB", 0.0)
         self.module_receiver.rec_ip_addr       = dsp_settings.get("default_ip", "0.0.0.0")
 
         self.module_signal_processor = SignalProcessor(data_que=self.sp_data_que, module_receiver=self.module_receiver, logging_level=self.logging_level)
@@ -239,17 +238,6 @@ class webInterface():
         self.module_receiver.eth_close()
     def close(self):
         pass
-    def config_squelch_value(self, squelch_threshold_dB):
-        """
-            Configures the squelch thresold both on the DAQ side and 
-            on the local DoA DSP side.
-        """        
-        #NOT USING THIS ANYMORE
-        self.daq_cfg_iface_status = 1
-        #self.module_signal_processor.squelch_threshold = 10**(squelch_threshold_dB/20)
-        #self.module_receiver.set_squelch_threshold(squelch_threshold_dB)
-        #webInterface_inst.logger.info("Updating receiver parameters")
-        #webInterface_inst.logger.info("Squelch threshold : {:f} dB".format(squelch_threshold_dB))
     def config_daq_rf(self, f0, gain):
         """
             Configures the RF parameters in the DAQ module
@@ -275,8 +263,6 @@ def read_config_file_dict(config_fname=daq_config_filename):
     ini_data['daq_buffer_size'] = parser.getint('daq','daq_buffer_size')
     ini_data['sample_rate'] = parser.getint('daq','sample_rate')
     ini_data['en_noise_source_ctr'] =  parser.getint('daq','en_noise_source_ctr')
-    ini_data['en_squelch'] = parser.getint('squelch','en_squelch')
-    ini_data['amplitude_threshold'] = parser.getfloat('squelch','amplitude_threshold')
     ini_data['cpi_size'] = parser.getint('pre_processing', 'cpi_size')
     ini_data['decimation_ratio'] = parser.getint('pre_processing', 'decimation_ratio')
     ini_data['fir_relative_bandwidth'] = parser.getfloat('pre_processing', 'fir_relative_bandwidth')
@@ -315,8 +301,6 @@ def write_config_file_dict(param_dict):
     parser['daq']['en_noise_source_ctr']=str(param_dict['en_noise_source_ctr'])
     # Set these for reconfigure
     parser['daq']['center_freq']=str(int(webInterface_inst.module_receiver.daq_center_freq))
-    parser['squelch']['en_squelch']=str(param_dict['en_squelch'])
-    parser['squelch']['amplitude_threshold']=str(param_dict['amplitude_threshold'])
     parser['pre_processing']['cpi_size']=str(param_dict['cpi_size'])
     parser['pre_processing']['decimation_ratio']=str(param_dict['decimation_ratio'])
     parser['pre_processing']['fir_relative_bandwidth']=str(param_dict['fir_relative_bandwidth'])
@@ -505,7 +489,6 @@ app.layout = html.Div([
     html.Div(id="placeholder_update_daq_ini_params", style={"display":"none"}),
     html.Div(id="placeholder_update_freq"          , style={"display":"none"}),
     html.Div(id="placeholder_update_dsp"           , style={"display":"none"}),
-    html.Div(id="placeholder_update_squelch"       , style={"display":"none"}),
     html.Div(id="placeholder_config_page_upd"      , style={"display":"none"}),
     html.Div(id="placeholder_spectrum_page_upd"    , style={"display":"none"}),
     html.Div(id="placeholder_doa_page_upd"         , style={"display":"none"}),
@@ -519,7 +502,6 @@ def generate_config_page_layout(webInterface_inst):
 
     if daq_cfg_dict is not None:
         en_noise_src_values       =[1] if daq_cfg_dict['en_noise_source_ctr']  else []
-        en_squelch_values         =[1] if daq_cfg_dict['en_squelch']  else []
         en_filter_rst_values      =[1] if daq_cfg_dict['en_filter_reset'] else []
         en_iq_cal_values          =[1] if daq_cfg_dict['en_iq_cal'] else []
         en_req_track_lock_values  =[1] if daq_cfg_dict['require_track_lock_intervention'] else []
@@ -1381,7 +1363,6 @@ def update_daq_ini_params(
 
             if daq_cfg_dict is not None:
                 en_noise_src_values       =[1] if daq_cfg_dict['en_noise_source_ctr']  else []
-                en_squelch_values         =[1] if daq_cfg_dict['en_squelch']  else []
                 en_filter_rst_values      =[1] if daq_cfg_dict['en_filter_reset'] else []
                 en_iq_cal_values          =[1] if daq_cfg_dict['en_iq_cal'] else []
                 en_req_track_lock_values  =[1] if daq_cfg_dict['require_track_lock_intervention'] else []
@@ -1437,7 +1418,6 @@ def update_daq_ini_params(
             cfg_daq_buffer_size = 262144 # This is a reasonable DAQ buffer size to use
             cfg_corr_size = 32768 # Reasonable value that never has problems calibrating
             en_noise_source_ctr = [1]
-            en_squelch_mode = [] # NOTE: For checkboxes, zero is defined by an empty array
             cfg_fir_bw = 1
             cfg_fir_window = 'hann'
             en_filter_reset = []
@@ -1478,7 +1458,6 @@ def update_daq_ini_params(
     param_dict['daq_buffer_size'] = cfg_daq_buffer_size
     param_dict['sample_rate'] = int(cfg_sample_rate*10**6)
     param_dict['en_noise_source_ctr'] = 1 if len(en_noise_source_ctr) else 0
-    param_dict['en_squelch'] = 0
     param_dict['cpi_size'] = cfg_cpi_size
     param_dict['decimation_ratio'] = cfg_decimation_ratio
     param_dict['fir_relative_bandwidth'] = cfg_fir_bw

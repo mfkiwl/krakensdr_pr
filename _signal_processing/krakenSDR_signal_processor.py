@@ -26,6 +26,7 @@ import logging
 import threading
 import queue
 import math
+import multiprocessing
 
 # Import optimization modules
 import numba as nb
@@ -91,12 +92,6 @@ class SignalProcessor(threading.Thread):
 
         # Squelch feature
         self.data_ready = False
-        self.en_squelch = False
-        self.squelch_threshold = 0.1
-        self.squelch_trigger_channel = 0
-        self.raw_signal_amplitude = np.empty(0)
-        self.filt_signal = np.empty(0)
-        self.squelch_mask = np.empty(0)
                 
         # DOA processing options
         self.en_DOA_Bartlett = False
@@ -146,7 +141,7 @@ class SignalProcessor(threading.Thread):
             Main processing thread        
         """
 
-        pyfftw.config.NUM_THREADS = 4
+        pyfftw.config.NUM_THREADS = multiprocessing.cpu_count()
         pyfftw.config.PLANNER_EFFORT = "FFTW_MEASURE" #"FFTW_PATIENT"
         scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
         pyfftw.interfaces.cache.enable()
@@ -159,10 +154,11 @@ class SignalProcessor(threading.Thread):
                 self.is_running = True
 
                 que_data_packet = []
-                start_time = time.time()
 
                 #-----> ACQUIRE NEW DATA FRAME <-----
                 self.module_receiver.get_iq_online()
+
+                start_time = time.time()
 
                 # Check frame type for processing
                 en_proc = (self.module_receiver.iq_header.frame_type == self.module_receiver.iq_header.FRAME_TYPE_DATA)# or \
@@ -204,25 +200,6 @@ class SignalProcessor(threading.Thread):
 
                     que_data_packet.append(['max_amplitude',max_amplitude])
 
-                    #-----> SQUELCH PROCESSING <-----
-
-                    if self.en_squelch:                    
-                        self.data_ready = False
-
-                        self.processed_signal, decimation_factor, self.fft_signal_width, self.max_index = \
-                                               center_max_signal(self.processed_signal, self.spectrum[0,:], max_spectrum, self.module_receiver.daq_squelch_th_dB, self.module_receiver.iq_header.sampling_freq)
-
-                        #decimated_signal = []
-                        #if(decimation_factor > 1):
-                        #    decimated_signal = signal.decimate(self.processed_signal, decimation_factor, n = decimation_factor * 2, ftype='fir')
-                        #    self.processed_signal = decimated_signal #.copy()
-
-
-                        #Only update if we're above the threshold
-                        if max_amplitude > self.module_receiver.daq_squelch_th_dB:
-                            self.data_ready = True
-
-                     
                     #-----> SPECTRUM PROCESSING <----- 
                     
                     if self.en_spectrum and self.data_ready:
@@ -303,13 +280,13 @@ class SignalProcessor(threading.Thread):
                 que_data_packet.append(['latency', int(stop_time*10**3)-self.module_receiver.iq_header.time_stamp])
 
                 # If the que is full, and data is ready (from squelching), clear the buffer immediately so that useful data has the priority
-                if self.data_que.full() and self.data_ready:
-                    try:
-                        #self.logger.info("BUFFER WAS NOT EMPTY, EMPTYING NOW")
-                        self.data_que.get(False) #empty que if not taken yet so fresh data is put in
-                    except queue.Empty:
-                        #self.logger.info("DIDNT EMPTY")
-                        pass
+                #if self.data_que.full() and self.data_ready:
+                #    try:
+                #        #self.logger.info("BUFFER WAS NOT EMPTY, EMPTYING NOW")
+                #        self.data_que.get(False) #empty que if not taken yet so fresh data is put in
+                #    except queue.Empty:
+                #        #self.logger.info("DIDNT EMPTY")
+                #        pass
 
                 # Put data into buffer, but if there is no data because its a cal/trig wait frame etc, then only write if the buffer is empty
                 # Otherwise just discard the data so that we don't overwrite good DATA frames.
