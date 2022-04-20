@@ -1,5 +1,9 @@
 # Kraken SDR Passive Radar
 
+## Quickstart Raspberry Pi 4 Image
+
+INFO COMING SOON.
+
 ## Installation
 
 1. Install the prerequisites
