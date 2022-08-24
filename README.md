@@ -24,7 +24,9 @@ DOWNLOAD LINK COMING
 
 Once you are in the OS to start the passive radar code, open a terminal and browse to the `krakensdr_pr` folder. Then run `./kraken_pr_start.sh`. Next see the Running heading below.
 
-## Installation
+## Manual Installation
+
+This is only required if you are not using the premade images, and are setting up the software from a clean system. 
 
 1. Install the prerequisites
 
