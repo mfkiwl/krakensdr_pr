@@ -1,8 +1,28 @@
 # Kraken SDR Passive Radar
 
+Please consult our Passive Radar Wiki page at https://github.com/krakenrf/krakensdr_docs/wiki/08.-Passive-Radar for more information.
+
 ## Quickstart Raspberry Pi 4 Image
 
-INFO COMING SOON.
+The passive radar software is preinstalled on the DOA PI4 Image at https://github.com/krakenrf/krakensdr_doa/releases/
+
+By default this image runs the DOA direction finding code on boot.
+
+To change to the passive radar code, connect a monitor and keyboard (or SSH in), and edit start.sh in the home folder. You will need to comment out the DOA code run lines, and uncomment the passive radar lines.
+
+Make sure to change the heimdall preconfig file to pr_2ch_2pow20, pr_2ch_2pow21 or pr_2ch_2pow22
+
+## Quickstart VirtualBox Image
+
+Another way to get started is with a more powerful machine like a Windows or Linux laptop/PC and our VirtualBox image. The image includes the KrakenSDR DOA, Passive Radar, and GNU Radio software.
+
+The image file is provided as an OVA file, so in VirtualBox go to File->Import to use it. Make sure you deselect the network interface upon install, and then before starting set networking to bridged mode, and select your own network interface.
+
+Note that this uses the VirtualBox USB3.0 implementation as we have found that the USB2.0 implementation is too slow and drops samples. The USB3.0 implementation works well. In order to use the USB3.0 implementation you will need the Oracle VM VirtualBox Extension Pack from https://www.virtualbox.org/wiki/Downloads installed to your VirtualBox.
+
+DOWNLOAD LINK COMING
+
+Once you are in the OS to start the passive radar code, open a terminal and browse to the `krakensdr_pr` folder. Then run `./kraken_pr_start.sh`. Next see the Running heading below.
 
 ## Installation
 
