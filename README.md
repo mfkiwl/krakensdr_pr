@@ -1,8 +1,26 @@
 # Kraken SDR Passive Radar
 
-NOTE still under development.
+Please consult our Passive Radar Wiki page at https://github.com/krakenrf/krakensdr_docs/wiki/08.-Passive-Radar for more information.
 
-## Installation
+## Quickstart Raspberry Pi 4 Image
+
+The passive radar software is preinstalled on the DOA PI4 Image at https://github.com/krakenrf/krakensdr_doa/releases/
+
+By default this image runs the DOA direction finding code on boot.
+
+To change to the passive radar code, connect a monitor and keyboard (or SSH in), and edit start.sh in the home folder. You will need to comment out the DOA code run lines, and uncomment the passive radar lines.
+
+Make sure to change the heimdall preconfig file to pr_2ch_2pow20, pr_2ch_2pow21 or pr_2ch_2pow22
+
+## Quickstart VirtualBox Image
+
+See our Wiki for more information about our VirtualBox Image and where to download it https://github.com/krakenrf/krakensdr_docs/wiki/10.-VirtualBox-and-Docker-Images#virtualbox
+
+Once you are in the OS to start the passive radar code, open a terminal and browse to the `krakensdr_pr` folder. Then run `./kraken_pr_start.sh`. Next see the Running heading below.
+
+## Manual Installation
+
+This is only required if you are not using the premade images, and are setting up the software from a clean system. 
 
 1. Install the prerequisites
 
@@ -42,12 +60,11 @@ conda install dash==1.20.0
 conda install werkzeug==2.0.2
 ```
 
-4. Install the krakensdr_pr software
+4. Clone the krakensdr_pr software
 
 ```bash
 cd ~/krakensdr
 git clone https://github.com/krakenrf/krakensdr_pr
-cd krakensdr_pr
 ```
 
 Copy the the *krakensdr_doa/util/kraken_doa_start.sh* and the *krakensdr_doa/util/kraken_doa_stop.sh* scripts into the krakensdr root folder of the project.
@@ -65,9 +82,13 @@ cp krakensdr_pr/util/kraken_pr_stop.sh .
 ./kraken_pr_start.sh
 ```
 
+Then browse to KRAKEN_IP_ADDR:8080 in a webbrowser on a computer on the same network.
+
+When the GUI loads, make sure to set an appropriate passive radar preconfig ini for the Heimdall DAQ. For example, choose "pr_2ch_2pow21", then click on "Reconfigure and Restart DAQ". This will configure the DAQ for passive radar, and then start the processing.
+
 Please be patient on the first run, at it can take 1-2 minutes for the JIT numba compiler to compile the numba optimized functions, and during this compilation time it may appear that the software has gotten stuck. On subsqeuent runs this loading time will be much faster as it will read from cache.
 
-Make sure to set an appropriate passive radar config ini for the Heimdall DAQ. (MORE INFO TO BE ADDED SOON, but basically, set decimation and FIR filtering to 1, set the sample rate to the max of 2.56 MHz, set the nubmer of RX channels to 2, DAQ buffer size 262144, CPI size to 524288 or larger (must be a power of 2). Then use channel 1 to connect your reference antenna, and channel 2 for your surveillance antenna.)
+Use CH0 to connect your reference antenna, and CH1 for your surveillance antenna.)
 
 ### Remote operation
 
