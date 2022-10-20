@@ -174,6 +174,9 @@ class webInterface():
 
         # Basic DAQ Config
         self.decimated_bandwidth = 12.5
+        
+        self.pr_graph_reset_flag = True
+
 
         if self.daq_ini_cfg_dict is not None:
             self.logger.info("Config file found and read succesfully")
@@ -440,10 +443,12 @@ waterfall_fig.update_layout(margin=go.layout.Margin(t=5))
 
 pr_init = [[-80] * 128] * 128
 y_range = list(range(-128, 128))
+x_range = list(range(0, 128))
 
 pr_fig = go.Figure(layout=fig_layout)
 pr_fig.add_trace(go.Heatmap(
                          z=pr_init,
+                         x=x_range,
                          y=y_range,
                          zsmooth='best', #False,
                          #zsmooth=False, #False,
@@ -1153,6 +1158,7 @@ def display_page(pathname):
         return [spectrum_page_layout, "header_inactive", "header_active", "header_inactive"]
     elif pathname == "/pr":
         webInterface_inst.module_signal_processor.en_spectrum = False
+        webInterface_inst.pr_graph_reset_flag = True
         plot_pr()
         return [generate_pr_page_layout(webInterface_inst), "header_inactive", "header_inactive", "header_active"]
     return Output('dummy_output', 'children', '') #[no_update, no_update, no_update, no_update]
@@ -1186,31 +1192,99 @@ def save_config_btn(input_value):
 
 def plot_pr():
     global pr_fig
+    c = 299792458
 
-    if webInterface_inst.RD_matrix is not None:
+    
+    CAFMatrix = np.abs(webInterface_inst.RD_matrix)
 
-        CAFMatrix = np.abs(webInterface_inst.RD_matrix)
+    CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
 
-        CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
+    if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
+        webInterface_inst.CAFMatrixPersist = CAFMatrix
+    else:
+        webInterface_inst.CAFMatrixPersist = np.maximum(webInterface_inst.CAFMatrixPersist, CAFMatrix)*webInterface_inst.pr_persist_decay #webInterface_inst.CAFMatrixPersist * 0.5 + CAFMatrix * 0.5
 
-        if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
-            webInterface_inst.CAFMatrixPersist = CAFMatrix
-        else:
-            webInterface_inst.CAFMatrixPersist = np.maximum(webInterface_inst.CAFMatrixPersist, CAFMatrix)*webInterface_inst.pr_persist_decay #webInterface_inst.CAFMatrixPersist * 0.5 + CAFMatrix * 0.5
+    CAFMatrixLog = 20 * np.log10(webInterface_inst.CAFMatrixPersist)
 
-        CAFMatrixLog = 20 * np.log10(webInterface_inst.CAFMatrixPersist)
+    CAFDynRange = webInterface_inst.pr_dynamic_range_min
+    CAFMatrixLog[CAFMatrixLog < CAFDynRange] = CAFDynRange
 
-        CAFDynRange = webInterface_inst.pr_dynamic_range_min
-        CAFMatrixLog[CAFMatrixLog < CAFDynRange] = CAFDynRange
+    CAFDynRange = webInterface_inst.pr_dynamic_range_max
+    CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
 
-        CAFDynRange = webInterface_inst.pr_dynamic_range_max
-        CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
-
-        y_height = CAFMatrixLog.shape[0]
-        y_range = list(np.arange(-y_height/2, y_height/2))
+    y_height = CAFMatrixLog.shape[0]
+    
+    bistatic_speed_ms = -webInterface_inst.module_signal_processor.max_doppler * c / webInterface_inst.module_receiver.daq_center_freq
+    bistatic_speed_kmh = bistatic_speed_ms * 3.6
+    
+    #y_range = list(np.arange(-y_height/2, y_height/2))
+    #y_range = list(np.linspace(-webInterface_inst.module_signal_processor.max_doppler, webInterface_inst.module_signal_processor.max_doppler, y_height)) # in Hz
+    
+    y_range = list(np.linspace(-bistatic_speed_kmh, bistatic_speed_kmh, y_height)) # in Hz
+    
+    #if webInterface_inst.RD_matrix is not None:
+    if not webInterface_inst.pr_graph_reset_flag:
 
         app.push_mods({
             'pr-graph': {'extendData': [dict(z = [CAFMatrixLog], y = [y_range]), [0], len(CAFMatrixLog)]}
+            #'pr-graph': {'extendData': [dict(z = [CAFMatrixLog], x = [x_range], y = [y_range]), [0], len(CAFMatrixLog)]}
+        })
+    else:
+        webInterface_inst.pr_graph_reset_flag = False
+        
+        x_length = CAFMatrixLog.shape[1]
+        bistatic_resolution = c / (webInterface_inst.module_receiver.iq_header.sampling_freq)
+        bistatic_resolution_km = bistatic_resolution / 1000
+        print(str(CAFMatrixLog.shape))
+        
+        x_range = list(np.linspace(0, x_length*bistatic_resolution_km, x_length))   
+
+        pr_fig = go.Figure(layout=fig_layout)
+        pr_fig.add_trace(go.Heatmap(
+                                 z=CAFMatrixLog,
+                                 x=x_range,
+                                 y=y_range,
+                                 zsmooth='best', #False,
+                                 #zsmooth=False, #False,
+                                 showscale=False,
+                                 #hoverinfo='skip',
+                                 colorscale=[[0.0, '#000020'],
+                                 [0.0714, '#000030'],
+                                 [0.1428, '#000050'],
+                                 [0.2142, '#000091'],
+                                 [0.2856, '#1E90FF'],
+                                 [0.357, '#FFFFFF'],
+                                 [0.4284, '#FFFF00'],
+                                 [0.4998, '#FE6D16'],
+                                 [0.5712, '#FE6D16'],
+                                 [0.6426, '#FF0000'],
+                                 [0.714, '#FF0000'],
+                                 [0.7854, '#C60000'],
+                                 [0.8568, '#9F0000'],
+                                 [0.9282, '#750000'],
+                                 [1.0, '#4A0000']]))        
+                                 
+                                 
+        pr_fig.update_xaxes(title_text="Bistatic Range [km]",
+                    color='rgba(255,255,255,1)',
+                    title_font_size=20,
+                    #tickfont_size=figure_font_size,
+                    #mirror=True,
+                    ticks='outside',
+                    showline=True)
+        pr_fig.update_yaxes(title_text="Bistatic Speed [km/h]",
+                    color='rgba(255,255,255,1)',
+                    title_font_size=20,
+                    #tickfont_size=figure_font_size,
+                    #range=[-5, 5],
+                    #mirror=True,
+                    ticks='outside',
+                    showline=True)
+        
+        #x_range
+        
+        app.push_mods({
+               'pr-graph': {'figure': pr_fig},
         })
 
 def plot_spectrum():

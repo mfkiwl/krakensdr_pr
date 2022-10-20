@@ -135,6 +135,7 @@ class SignalProcessor(threading.Thread):
 
         self.spectrum = None #np.ones((self.channel_number+2,N), dtype=np.float32)
         self.spectrum_upd_counter = 0
+        
 
     def run(self):
         """
