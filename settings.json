@@ -15,5 +15,7 @@
   "en_hw_check": 0,
   "en_advanced_daq_cfg": [],
   "logging_level": 5,
-  "disable_tooltips": 0
+  "disable_tooltips": 0,
+  "krakenpro_key": "0ae4ca",
+  "doa_data_format": "Kraken Pro Remote"
 }

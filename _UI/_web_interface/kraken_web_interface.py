@@ -26,6 +26,7 @@ import queue
 import time
 import subprocess
 import json
+import requests
 # Import third-party modules
 
 import dash_core_components as dcc
@@ -43,6 +44,8 @@ from configparser import ConfigParser
 from numba import njit, jit
 
 from threading import Timer
+
+c = 299792458
 
 # Import Kraken SDR modules
 current_path          = os.path.dirname(os.path.realpath(__file__))
@@ -176,7 +179,7 @@ class webInterface():
         self.decimated_bandwidth = 12.5
         
         self.pr_graph_reset_flag = True
-
+        self.max_bistatic_speed_kmh = (-self.module_signal_processor.max_doppler * c / self.module_receiver.daq_center_freq) * 3.6 # TODO: set this based on max_doppler in settings
 
         if self.daq_ini_cfg_dict is not None:
             self.logger.info("Config file found and read succesfully")
@@ -263,7 +266,6 @@ def read_config_file_dict(config_fname=daq_config_filename):
 
     ini_data['config_name'] = parser.get('meta', 'config_name')
     ini_data['num_ch'] = parser.getint('hw', 'num_ch')
-    ini_data['en_bias_tee'] = parser.get('hw', 'en_bias_tee')
     ini_data['daq_buffer_size'] = parser.getint('daq','daq_buffer_size')
     ini_data['sample_rate'] = parser.getint('daq','sample_rate')
     ini_data['en_noise_source_ctr'] =  parser.getint('daq','en_noise_source_ctr')
@@ -300,7 +302,6 @@ def write_config_file_dict(param_dict):
 
     parser['meta']['config_name']=str(param_dict['config_name'])
     parser['hw']['num_ch']=str(param_dict['num_ch'])
-    parser['hw']['en_bias_tee']=str(param_dict['en_bias_tee'])
     parser['daq']['daq_buffer_size']=str(param_dict['daq_buffer_size'])
     parser['daq']['sample_rate']=str(param_dict['sample_rate'])
     parser['daq']['en_noise_source_ctr']=str(param_dict['en_noise_source_ctr'])
@@ -658,12 +659,6 @@ def generate_config_page_layout(webInterface_inst):
                     html.Div("# RX Channels:", className="field-label"),                                         
                     dcc.Input(id='cfg_rx_channels', value=daq_cfg_dict['num_ch'], type='number', debounce=True, className="field-body-textbox")
             ], className="field"),
-
-            html.Div([
-                    html.Div("Bias Tee Control:", className="field-label"),
-                    dcc.Input(id='cfg_en_bias_tee', value=daq_cfg_dict['en_bias_tee'], type='text', debounce=True, className="field-body-textbox")
-            ], className="field"),
-
             html.H3("DAQ", id="cfg_group_daq"),
             html.Div([
                     html.Div("DAQ Buffer Size:", className="field-label", id="label_daq_buffer_size"),                                                                 
@@ -839,6 +834,11 @@ def generate_config_page_layout(webInterface_inst):
                     ],
             value=webInterface_inst.module_signal_processor.max_bistatic_range, style={"display":"inline-block"},className="field-body")
             ], className="field"),
+            
+            
+        html.Div([html.Div("Max Bistatic Speed [km/h]:"             , id="label_max_bistatic_speed_kmh"  ,style={"display":"inline-block"}, className="field-label"), 
+            dcc.Input(id="max_bistatic_speed_kmh", value=webInterface_inst.max_bistatic_speed_kmh, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
+        ], style={'display':'inline-block'}, className="field"),
 
         html.Div([html.Div("Max Doppler [Hz]:"             , id="label_max_doppler"  ,style={"display":"inline-block"}, className="field-label"), 
             dcc.Input(id="max_doppler", value=webInterface_inst.module_signal_processor.max_doppler, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
@@ -1197,6 +1197,27 @@ def stop_proc_btn(input_value):
 def save_config_btn(input_value):
     webInterface_inst.logger.info("Saving DAQ and DSP Configuration")
     webInterface_inst.save_configuration()
+    
+    
+@app.callback_shared(
+    None,
+    [Input('pr-graph', 'clickData')]
+)
+def click_pr_spectrum(clickData):
+    r_b = clickData['points'][0]['x']
+    print(r_b)    
+    wr_pr_json(r_b)
+    # upload json here
+    
+def wr_pr_json(r_b):
+
+    jsonDict = {}
+    jsonDict["rb"] = r_b
+    try:
+        r = requests.post('http://127.0.0.1:8042/prpost', json=jsonDict)
+    except requests.exceptions.RequestException as e:
+        webInterface_inst.logger.error("Error while posting to local websocket server")
+    
 
 def plot_pr():
     global pr_fig
@@ -1366,11 +1387,12 @@ def plot_spectrum():
     Input(component_id ="persist_decay"       , component_property='value'),
     Input(component_id ="max_bistatic_range"           , component_property='value'),
     Input(component_id ="max_doppler"           , component_property='value'),
+    Input(component_id ="max_bistatic_speed_kmh"           , component_property='value'),
     Input(component_id ="clutter_cancel_algo"           , component_property='value'),
     Input(component_id ="dynrange_max"           , component_property='value'),
     Input(component_id ="dynrange_min"           , component_property='value')]
 )
-def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistatic_range, max_doppler, clutter_cancel_algo, dynrange_max, dynrange_min): #, input_value):
+def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistatic_range, max_doppler, max_bistatic_speed_kmh, clutter_cancel_algo, dynrange_max, dynrange_min): #, input_value):
 
     if en_pr is not None and len(en_pr):
         webInterface_inst.logger.debug("Passive Radar enabled")
@@ -1385,7 +1407,11 @@ def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistati
 
     webInterface_inst.module_signal_processor.PR_clutter_cancellation = clutter_cancel_algo
     webInterface_inst.module_signal_processor.max_bistatic_range = max_bistatic_range
-    webInterface_inst.module_signal_processor.max_doppler = max_doppler
+    
+    webInterface_inst.max_bistatic_speed_kmh = max_bistatic_speed_kmh
+    #webInterface_inst.module_signal_processor.max_doppler = max_doppler # Set this based on max_bistatic_speed
+    webInterface_inst.module_signal_processor.max_doppler = (-(max_bistatic_speed_kmh/3.6) * webInterface_inst.module_receiver.daq_center_freq) / c
+    
     webInterface_inst.pr_persist_decay = persist_decay
     webInterface_inst.pr_dynamic_range_min = dynrange_min
     webInterface_inst.pr_dynamic_range_max = dynrange_max
@@ -1417,8 +1443,9 @@ def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistati
     Input('cfg_data_block_len'       ,'value'),
     Input('cfg_decimated_bw'         ,'value'),
     Input('cfg_recal_interval'       ,'value'),
-    Input('cfg_en_bias_tee'          ,'value'),
-    Input('daq_cfg_files'            , 'value')]
+    Input('daq_cfg_files'            , 'value'),
+
+]
 )
 def update_daq_ini_params(
                     cfg_rx_channels,cfg_daq_buffer_size,cfg_sample_rate,en_noise_source_ctr, \
@@ -1427,7 +1454,7 @@ def update_daq_ini_params(
                     cfg_std_ch_ind,en_iq_cal,cfg_gain_lock,en_req_track_lock_intervention, \
                     cfg_cal_track_mode,cfg_amplitude_cal_mode,cfg_cal_frame_interval, \
                     cfg_cal_frame_burst_size, cfg_amplitude_tolerance,cfg_phase_tolerance, \
-                    cfg_max_sync_fails, cfg_data_block_len, cfg_decimated_bw, cfg_recal_interval, cfg_en_bias_tee, config_fname):
+                    cfg_max_sync_fails, cfg_data_block_len, cfg_decimated_bw, cfg_recal_interval, config_fname):
     # TODO: Use disctionarry instead of parameter list 
 
     ctx = dash.callback_context
@@ -1448,8 +1475,8 @@ def update_daq_ini_params(
                 en_iq_cal_values          =[1] if daq_cfg_dict['en_iq_cal'] else []
                 en_req_track_lock_values  =[1] if daq_cfg_dict['require_track_lock_intervention'] else []
 
-            #en_persist_values     =[1] if webInterface_inst.en_persist else []
-            #en_pr_values          =[1] if webInterface_inst.module_signal_processor.en_PR else []
+            en_persist_values     =[1] if webInterface_inst.en_persist else []
+            en_pr_values          =[1] if webInterface_inst.module_signal_processor.en_PR else []
 
             en_advanced_daq_cfg   =[1] if webInterface_inst.en_advanced_daq_cfg                       else []
 
@@ -1536,7 +1563,6 @@ def update_daq_ini_params(
     param_dict = webInterface_inst.daq_ini_cfg_dict
     param_dict['config_name'] = "Custom"
     param_dict['num_ch'] = cfg_rx_channels
-    param_dict['en_bias_tee'] = cfg_en_bias_tee
     param_dict['daq_buffer_size'] = cfg_daq_buffer_size
     param_dict['sample_rate'] = int(cfg_sample_rate*10**6)
     param_dict['en_noise_source_ctr'] = 1 if len(en_noise_source_ctr) else 0
