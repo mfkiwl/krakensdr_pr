@@ -27,6 +27,7 @@ import time
 import subprocess
 import json
 import requests
+import math
 # Import third-party modules
 
 import dash_core_components as dcc
@@ -39,9 +40,22 @@ from dash.exceptions import PreventUpdate
 from dash.dash import no_update
 import plotly.graph_objects as go
 import plotly.express as px
+import plotly.io as pio
+import io
+
 import numpy as np
 from configparser import ConfigParser
 from numba import njit, jit
+
+
+from PIL import Image
+from matplotlib import cm
+from matplotlib.colors import Normalize
+import scipy
+from scipy.ndimage.filters import gaussian_filter
+from skimage.transform import resize
+
+
 
 from threading import Timer
 
@@ -179,7 +193,9 @@ class webInterface():
         self.decimated_bandwidth = 12.5
         
         self.pr_graph_reset_flag = True
-        self.max_bistatic_speed_kmh = (-self.module_signal_processor.max_doppler * c / self.module_receiver.daq_center_freq) * 3.6 # TODO: set this based on max_doppler in settings
+        self.max_bistatic_speed_kmh = (self.module_signal_processor.max_doppler * c / self.module_receiver.daq_center_freq) * 3.6 # TODO: set this based on max_doppler in settings
+
+        self.krakenpro_key = dsp_settings.get("krakenpro_key", "mykey")
 
         if self.daq_ini_cfg_dict is not None:
             self.logger.info("Config file found and read succesfully")
@@ -217,6 +233,10 @@ class webInterface():
         data["en_advanced_daq_cfg"] = self.en_advanced_daq_cfg
         data["logging_level"]       = dsp_settings.get("logging_level", 0) #settings.logging_level
         data["disable_tooltips"]    = dsp_settings.get("disable_tooltips", 0) #settings.disable_tooltips
+
+        # Station Information
+        data["krakenpro_key"] = self.krakenpro_key
+        data["doa_data_format"] = "Kraken Pro Remote" # Force this
 
         #settings.write(data)
         with open(settings_file_path, 'w') as outfile:
@@ -474,6 +494,10 @@ pr_fig.add_trace(go.Heatmap(
                          [1.0, '#4A0000']]))
 
 
+
+
+
+
 #app = dash.Dash(__name__, suppress_callback_exceptions=True, compress=True, update_title="") # cannot use update_title with dash_devices
 app = dash.Dash(__name__, suppress_callback_exceptions=True, compress=True)
 
@@ -532,6 +556,10 @@ def generate_config_page_layout(webInterface_inst):
     cfg_decimated_bw = ((daq_cfg_dict['sample_rate']) / daq_cfg_dict['decimation_ratio']) / 10**3
     cfg_data_block_len = ( daq_cfg_dict['cpi_size'] / (cfg_decimated_bw) )
     cfg_recal_interval =  (daq_cfg_dict['cal_frame_interval'] * (cfg_data_block_len/10**3)) / 60
+
+    bistatic_distance = webInterface_inst.module_signal_processor.max_bistatic_range
+    bistatic_resolution = c / (daq_cfg_dict['sample_rate'])
+    bistatic_resolution_km = bistatic_resolution / 1000
 
     if daq_cfg_dict['cal_track_mode'] == 0:
         cfg_recal_interval = 1
@@ -592,13 +620,13 @@ def generate_config_page_layout(webInterface_inst):
                 dcc.Input(id='daq_center_freq', value=webInterface_inst.module_receiver.daq_center_freq/10**6, type='number', debounce=True, className="field-body-textbox")
                 ], className="field"),
         html.Div([
-                html.Div("Receiver gain", className="field-label"), 
+                html.Div("CH0 Reference Gain", className="field-label"), 
                 dcc.Dropdown(id='daq_rx_gain',
                         options=gain_list,
                     value=webInterface_inst.module_receiver.daq_rx_gain[0], clearable=False, style={"display":"inline-block", "padding-bottom":"5px"}, className="field-body"),
                 #], className="field"),
 
-                html.Div("Receiver 2 gain", className="field-label"), 
+                html.Div("CH1 Surveillance Gain", className="field-label"), 
                 dcc.Dropdown(id='daq_rx_gain_2',
                         options=gain_list,
                     value=webInterface_inst.module_receiver.daq_rx_gain[1], clearable=False, style={"display":"inline-block"}, className="field-body"),
@@ -824,25 +852,25 @@ def generate_config_page_layout(webInterface_inst):
         html.Div([html.Div("Max Bistatic Range [km]:"             , id="label_max_bistatic_range"  , className="field-label"), 
             dcc.Dropdown(id='max_bistatic_range',
                 options=[
-                    {'label': '16', 'value': 16},
-                    {'label': '32'   , 'value': 32},
-                    {'label': '64'   , 'value': 64},
-                    {'label': '128'   , 'value': 128},
-                    {'label': '256'   , 'value': 256},
-                    {'label': '512'   , 'value': 512},
-                    {'label': '1024'   , 'value': 1024},
+                    {'label': round(16 * bistatic_resolution_km, 1), 'value': 16},
+                    {'label': round(32 * bistatic_resolution_km, 1)   , 'value': 32},
+                    {'label': round(64 * bistatic_resolution_km, 1)   , 'value': 64},
+                    {'label': round(128 * bistatic_resolution_km, 1)   , 'value': 128},
+                    {'label': round(256 * bistatic_resolution_km, 1)   , 'value': 256},
+                    {'label': round(512 * bistatic_resolution_km, 1)   , 'value': 512},
+                    {'label': round(1024 * bistatic_resolution_km, 1)   , 'value': 1024},
                     ],
             value=webInterface_inst.module_signal_processor.max_bistatic_range, style={"display":"inline-block"},className="field-body")
             ], className="field"),
             
             
         html.Div([html.Div("Max Bistatic Speed [km/h]:"             , id="label_max_bistatic_speed_kmh"  ,style={"display":"inline-block"}, className="field-label"), 
-            dcc.Input(id="max_bistatic_speed_kmh", value=webInterface_inst.max_bistatic_speed_kmh, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
+            dcc.Input(id="max_bistatic_speed_kmh", value=abs(webInterface_inst.max_bistatic_speed_kmh), type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
         ], style={'display':'inline-block'}, className="field"),
 
-        html.Div([html.Div("Max Doppler [Hz]:"             , id="label_max_doppler"  ,style={"display":"inline-block"}, className="field-label"), 
-            dcc.Input(id="max_doppler", value=webInterface_inst.module_signal_processor.max_doppler, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
-            ], style={'display':'inline-block'}, className="field"),
+        #html.Div([html.Div("Max Doppler [Hz]:"             , id="label_max_doppler"  ,style={"display":"inline-block"}, className="field-label"), 
+        #    dcc.Input(id="max_doppler", value=webInterface_inst.module_signal_processor.max_doppler, type='number', style={"display":"inline-block"}, debounce=True, #className="field-body-textbox")
+        #    ], style={'display':'inline-block'}, className="field"),
 
         html.Div([html.Div("PR Persist", id="label_en_persist"     , className="field-label"),
                 dcc.Checklist(options=option     , id="en_persist_check"     , className="field-body", value=en_persist_values),
@@ -866,11 +894,23 @@ def generate_config_page_layout(webInterface_inst):
 
     ], className="card")
 
+
+
+
+    krakenpro_config_card = \
+    html.Div([
+        html.H2("Kraken Pro Config", id="init_title_d"),
+        html.Div([html.Div("Kraken Pro API Key:"             , id="label_kraken_pro_api_key"  ,style={"display":"inline-block"}, className="field-label"), 
+            dcc.Input(id="kraken_pro_api_key", value=webInterface_inst.krakenpro_key, type='text', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
+        ], style={'display':'inline-block'}, className="field"),
+
+    ], className="card")
+
     #-----------------------------
     #    Display Options Card
     #-----------------------------
     #config_page_component_list = [daq_config_card, daq_status_card, dsp_config_card, display_options_card,squelch_card]
-    config_page_component_list = [start_stop_card, daq_config_card, daq_status_card, dsp_config_card]
+    config_page_component_list = [start_stop_card, daq_config_card, daq_status_card, dsp_config_card, krakenpro_config_card]
 
     if not webInterface_inst.disable_tooltips:
         config_page_component_list.append(tooltips.dsp_config_tooltips)
@@ -897,10 +937,11 @@ def generate_pr_page_layout(webInterface_inst):
     pr_page_layout = html.Div([
         html.Div([
         dcc.Graph(
-            style={"height": "inherit", "width" : "100%"},
+            style={"height": "inherit"},
             id="pr-graph",
             figure=pr_fig, #fig_dummy #doa_fig #fig_dummy
-        )], style={'width': '100%', 'height': '85vh'}), #className="monitor_card"),
+        )], style={'width': '100%', 'height': '85vh', "display": "flex", "justify-content": "space-around",
+}), #className="monitor_card"),
     ])
     return pr_page_layout
 
@@ -1223,10 +1264,12 @@ def plot_pr():
     global pr_fig
     c = 299792458
 
-    
     CAFMatrix = np.abs(webInterface_inst.RD_matrix)
 
-    CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
+    #CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
+    #CAFMatrix = CAFMatrix  / np.amax(CAFMatrix)  # Noramlize with the maximum value
+
+    CAFMatrix = CAFMatrix - np.amin(CAFMatrix) / (np.amax(CAFMatrix) - np.amin(CAFMatrix))
 
     if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
         webInterface_inst.CAFMatrixPersist = CAFMatrix
@@ -1241,42 +1284,154 @@ def plot_pr():
     CAFDynRange = webInterface_inst.pr_dynamic_range_max
     CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
 
+    CAFMatrixLog = resize(CAFMatrixLog,(512,512),order=3) 
+
     y_height = CAFMatrixLog.shape[0]
     
     bistatic_speed_ms = -webInterface_inst.module_signal_processor.max_doppler * c / webInterface_inst.module_receiver.daq_center_freq
     bistatic_speed_kmh = bistatic_speed_ms * 3.6
     
-    #y_range = list(np.arange(-y_height/2, y_height/2))
-    #y_range = list(np.linspace(-webInterface_inst.module_signal_processor.max_doppler, webInterface_inst.module_signal_processor.max_doppler, y_height)) # in Hz
-    
     y_range = list(np.linspace(-bistatic_speed_kmh, bistatic_speed_kmh, y_height)) # in Hz
     
+    #webInterface_inst.pr_graph_reset_flag = True
     #if webInterface_inst.RD_matrix is not None:
     if not webInterface_inst.pr_graph_reset_flag:
 
         app.push_mods({
-            'pr-graph': {'extendData': [dict(z = [CAFMatrixLog], y = [y_range]), [0], len(CAFMatrixLog)]}
-            #'pr-graph': {'extendData': [dict(z = [CAFMatrixLog], x = [x_range], y = [y_range]), [0], len(CAFMatrixLog)]}
+           'pr-graph': {'extendData': [dict(z = [CAFMatrixLog]), [0], len(CAFMatrixLog)]}
+          #'pr-graph': {'extendData': [dict(z = [CAFMatrixLog], y = [y_range]), [0], len(CAFMatrixLog)]}
         })
     else:
         webInterface_inst.pr_graph_reset_flag = False
         
         x_length = CAFMatrixLog.shape[1]
+        bistatic_distance = webInterface_inst.module_signal_processor.max_bistatic_range
         bistatic_resolution = c / (webInterface_inst.module_receiver.iq_header.sampling_freq)
         bistatic_resolution_km = bistatic_resolution / 1000
         print(str(CAFMatrixLog.shape))
         
-        x_range = list(np.linspace(0, x_length*bistatic_resolution_km, x_length))   
+        x_range = list(np.linspace(0, bistatic_distance*bistatic_resolution_km, x_length)) 
 
+        # matrixMax = np.amax(CAFMatrixLog)
+        # matrixMin = np.amin(CAFMatrixLog)
+        # cNorm = Normalize(vmin=webInterface_inst.pr_dynamic_range_min, vmax=webInterface_inst.pr_dynamic_range_max)
+        # scalarMap  = cm.ScalarMappable(cmap='jet')
+
+        # smoothedCAFMatrixLog = gaussian_filter(CAFMatrixLog, sigma=0.5)
+
+        # seg_colors = scalarMap.to_rgba(smoothedCAFMatrixLog) 
+        # img = Image.fromarray(np.uint8(seg_colors*255))
+
+        # img_fig = go.Figure(layout=fig_layout)
+        # img_fig.add_trace(go.Heatmap(
+                                 # z=CAFMatrixLog,
+                                 # x=x_range,
+                                 # y=y_range,
+                                 # zsmooth='best', #False,
+                                 # #zsmooth=False, #False,
+                                 # showscale=False,
+                                 # #hoverinfo='skip',
+                                 # colorscale=[[0.0, '#000020'],
+                                 # [0.0714, '#000030'],
+                                 # [0.1428, '#000050'],
+                                 # [0.2142, '#000091'],
+                                 # [0.2856, '#1E90FF'],
+                                 # [0.357, '#FFFFFF'],
+                                 # [0.4284, '#FFFF00'],
+                                 # [0.4998, '#FE6D16'],
+                                 # [0.5712, '#FE6D16'],
+                                 # [0.6426, '#FF0000'],
+                                 # [0.714, '#FF0000'],
+                                 # [0.7854, '#C60000'],
+                                 # [0.8568, '#9F0000'],
+                                 # [0.9282, '#750000'],
+                                 # [1.0, '#4A0000']]))        
+                                 
+                                 
+        # img_fig.update_xaxes(title_text="Bistatic Range [km]",
+                    # color='rgba(255,255,255,1)',
+                    # title_font_size=20,
+                    # #tickfont_size=figure_font_size,
+                    # #mirror=True,
+                    # ticks='outside',
+                    # showline=True)
+        # img_fig.update_yaxes(title_text="Bistatic Speed [km/h]",
+                    # color='rgba(255,255,255,1)',
+                    # title_font_size=20,
+                    # #tickfont_size=figure_font_size,
+                    # #range=[-5, 5],
+                    # #mirror=True,
+                    # ticks='outside',
+                    # showline=True)
+
+        # img_bytes = pio.to_image(img_fig, format = 'png')
+        # img = Image.open(io.BytesIO(img_bytes))
+
+##################
+        # pr_fig = go.Figure(layout=fig_layout)
+        # pr_fig.add_trace(go.Image(z=img))
+
+##################
+
+        # xmin = x_range[0]
+        # xmax = x_range[len(x_range)-1]
+        # ymin = y_range[0]
+        # ymax = y_range[len(y_range)-1]
+
+        # pr_fig = go.Figure(layout=fig_layout)
+        
+        # pr_fig.add_trace(go.Scatter(
+                            # x=[xmin, xmax],
+                            # y=[ymin, ymax],
+                            # mode="markers",
+                            # marker={"color":[matrixMin, matrixMax],
+                                    # "colorscale":'Viridis',
+                                    # "showscale":True,
+                                    # "colorbar":{"title":"Counts",
+                                                # "titleside": "right"},
+                                    # "opacity": 0
+                                   # }
+                                   # )
+                        # )
+
+        # pr_fig.update_layout(
+            # images=[go.layout.Image(
+                # x=xmin,
+                # sizex=xmax-xmin,
+                # y=ymax,
+                # sizey=ymax-ymin,
+                # xref="x",
+                # yref="y",
+                # opacity=1.0,
+                # layer="below",
+                # sizing="stretch",
+                # source=img)]
+            # )
+            
+            
+        # # Constants
+        # img_width = 1500
+        # img_height = 900
+
+            # # Configure other layout
+        # pr_fig.update_layout(
+            # xaxis=dict(showgrid=False, zeroline=False, range=[xmin, xmax]),
+            # yaxis=dict(showgrid=False, zeroline=False, range=[ymin, ymax]),
+            # width=img_width,
+            # height=img_height,
+        # )
+
+######################
+         
         pr_fig = go.Figure(layout=fig_layout)
         pr_fig.add_trace(go.Heatmap(
                                  z=CAFMatrixLog,
                                  x=x_range,
                                  y=y_range,
                                  zsmooth='best', #False,
-                                 #zsmooth=False, #False,
+                                 # zsmooth=False, #False,
                                  showscale=False,
-                                 #hoverinfo='skip',
+                                 # hoverinfo='skip',
                                  colorscale=[[0.0, '#000020'],
                                  [0.0714, '#000030'],
                                  [0.1428, '#000050'],
@@ -1297,23 +1452,33 @@ def plot_pr():
         pr_fig.update_xaxes(title_text="Bistatic Range [km]",
                     color='rgba(255,255,255,1)',
                     title_font_size=20,
-                    #tickfont_size=figure_font_size,
-                    #mirror=True,
+                    # tickfont_size=figure_font_size,
+                    # mirror=True,
                     ticks='outside',
                     showline=True)
         pr_fig.update_yaxes(title_text="Bistatic Speed [km/h]",
                     color='rgba(255,255,255,1)',
                     title_font_size=20,
-                    #tickfont_size=figure_font_size,
-                    #range=[-5, 5],
-                    #mirror=True,
+                    # tickfont_size=figure_font_size,
+                    # range=[-5, 5],
+                    # mirror=True,
                     ticks='outside',
                     showline=True)
-        
-        #x_range
-        
+
+        # Constants
+        img_width = 900
+        img_height = 800
+
+            # Configure other layout
+        pr_fig.update_layout(
+            #xaxis=dict(showgrid=False, zeroline=False, range=[xmin, xmax]),
+            #yaxis=dict(showgrid=False, zeroline=False, range=[ymin, ymax]),
+            width=img_width,
+            height=img_height,
+        )
+            
         app.push_mods({
-               'pr-graph': {'figure': pr_fig},
+                'pr-graph': {'figure': pr_fig},
         })
 
 def plot_spectrum():
@@ -1378,6 +1543,12 @@ def plot_spectrum():
             'waterfall-graph': {'extendData': [dict(z =[[webInterface_inst.spectrum[1, :]]]), [0], 50]}
         })
 
+@app.callback(
+    None,
+    [Input(component_id ="kraken_pro_api_key", component_property='children')]
+)
+def update_kraken_pro(apikey):
+    webInterface_inst.krakenpro_key = apikey
 
 @app.callback(
     None,
@@ -1386,13 +1557,14 @@ def plot_spectrum():
     Input(component_id ="en_persist_check"       , component_property='value'),
     Input(component_id ="persist_decay"       , component_property='value'),
     Input(component_id ="max_bistatic_range"           , component_property='value'),
-    Input(component_id ="max_doppler"           , component_property='value'),
+    #Input(component_id ="max_doppler"           , component_property='value'),
     Input(component_id ="max_bistatic_speed_kmh"           , component_property='value'),
     Input(component_id ="clutter_cancel_algo"           , component_property='value'),
     Input(component_id ="dynrange_max"           , component_property='value'),
     Input(component_id ="dynrange_min"           , component_property='value')]
 )
-def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistatic_range, max_doppler, max_bistatic_speed_kmh, clutter_cancel_algo, dynrange_max, dynrange_min): #, input_value):
+#def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistatic_range, max_doppler, max_bistatic_speed_kmh, clutter_cancel_algo, dynrange_max, dynrange_min): #, input_value):
+def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistatic_range, max_bistatic_speed_kmh, clutter_cancel_algo, dynrange_max, dynrange_min): #, input_value):
 
     if en_pr is not None and len(en_pr):
         webInterface_inst.logger.debug("Passive Radar enabled")
@@ -1410,7 +1582,7 @@ def update_dsp_params(update_freq, en_pr, en_persist, persist_decay, max_bistati
     
     webInterface_inst.max_bistatic_speed_kmh = max_bistatic_speed_kmh
     #webInterface_inst.module_signal_processor.max_doppler = max_doppler # Set this based on max_bistatic_speed
-    webInterface_inst.module_signal_processor.max_doppler = (-(max_bistatic_speed_kmh/3.6) * webInterface_inst.module_receiver.daq_center_freq) / c
+    webInterface_inst.module_signal_processor.max_doppler = ((max_bistatic_speed_kmh/3.6) * webInterface_inst.module_receiver.daq_center_freq) / c
     
     webInterface_inst.pr_persist_decay = persist_decay
     webInterface_inst.pr_dynamic_range_min = dynrange_min
@@ -1723,6 +1895,7 @@ def reconfig_daq_chain(input_value, freq, gain):
     webInterface_inst.pr_persist_decay = pr_persist_decay
     webInterface_inst.pr_dynamic_range_min = pr_dynamic_range_min
     webInterface_inst.pr_dynamic_range_max = pr_dynamic_range_max
+
 
     webInterface_inst.module_signal_processor.start()
 

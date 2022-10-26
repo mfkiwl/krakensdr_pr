@@ -19,5 +19,5 @@ python3 _UI/_web_interface/kraken_web_interface.py 2> ui.log &
 #sudo php -S $IPADDR:$IPPORT -t _android_web 2> /dev/null &
 
 # Start nodejs server for KrakenSDR Pro App
-#node middleware/index.js  1> /dev/null 2> /dev/null &
-node middleware/index.js
+node middleware/index.js  1> /dev/null 2> /dev/null &
+#node middleware/index.js
