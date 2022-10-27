@@ -1256,8 +1256,10 @@ def wr_pr_json(r_b):
     jsonDict["rb"] = r_b
     try:
         r = requests.post('http://127.0.0.1:8042/prpost', json=jsonDict)
+        print(r)
     except requests.exceptions.RequestException as e:
         webInterface_inst.logger.error("Error while posting to local websocket server")
+        print("error: " + str(e))
     
 
 def plot_pr():
@@ -1268,7 +1270,7 @@ def plot_pr():
 
     #CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
     #CAFMatrix = CAFMatrix  / np.amax(CAFMatrix)  # Noramlize with the maximum value
-
+    starttime = time.time()
     CAFMatrix = CAFMatrix - np.amin(CAFMatrix) / (np.amax(CAFMatrix) - np.amin(CAFMatrix))
 
     if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
@@ -1284,7 +1286,11 @@ def plot_pr():
     CAFDynRange = webInterface_inst.pr_dynamic_range_max
     CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
 
-    CAFMatrixLog = resize(CAFMatrixLog,(512,512),order=3) 
+    
+    CAFMatrixLog = resize(CAFMatrixLog,(1024,1024),order=1) 
+    endtime = time.time()
+
+    print("resize time taken: " + str((endtime-starttime)*1000))
 
     y_height = CAFMatrixLog.shape[0]
     
@@ -1293,7 +1299,7 @@ def plot_pr():
     
     y_range = list(np.linspace(-bistatic_speed_kmh, bistatic_speed_kmh, y_height)) # in Hz
     
-    #webInterface_inst.pr_graph_reset_flag = True
+    webInterface_inst.pr_graph_reset_flag = True
     #if webInterface_inst.RD_matrix is not None:
     if not webInterface_inst.pr_graph_reset_flag:
 
@@ -1312,15 +1318,15 @@ def plot_pr():
         
         x_range = list(np.linspace(0, bistatic_distance*bistatic_resolution_km, x_length)) 
 
-        # matrixMax = np.amax(CAFMatrixLog)
-        # matrixMin = np.amin(CAFMatrixLog)
-        # cNorm = Normalize(vmin=webInterface_inst.pr_dynamic_range_min, vmax=webInterface_inst.pr_dynamic_range_max)
-        # scalarMap  = cm.ScalarMappable(cmap='jet')
+        matrixMax = np.amax(CAFMatrixLog)
+        matrixMin = np.amin(CAFMatrixLog)
+        cNorm = Normalize(vmin=webInterface_inst.pr_dynamic_range_min, vmax=webInterface_inst.pr_dynamic_range_max)
+        scalarMap  = cm.ScalarMappable(cmap='jet')
 
-        # smoothedCAFMatrixLog = gaussian_filter(CAFMatrixLog, sigma=0.5)
+        #smoothedCAFMatrixLog = gaussian_filter(CAFMatrixLog, sigma=0.5)
 
-        # seg_colors = scalarMap.to_rgba(smoothedCAFMatrixLog) 
-        # img = Image.fromarray(np.uint8(seg_colors*255))
+        seg_colors = scalarMap.to_rgba(CAFMatrixLog) 
+        img = Image.fromarray(np.uint8(seg_colors*255))
 
         # img_fig = go.Figure(layout=fig_layout)
         # img_fig.add_trace(go.Heatmap(
@@ -1373,82 +1379,53 @@ def plot_pr():
 
 ##################
 
-        # xmin = x_range[0]
-        # xmax = x_range[len(x_range)-1]
-        # ymin = y_range[0]
-        # ymax = y_range[len(y_range)-1]
+        xmin = x_range[0]
+        xmax = x_range[len(x_range)-1]
+        ymin = y_range[0]
+        ymax = y_range[len(y_range)-1]
 
-        # pr_fig = go.Figure(layout=fig_layout)
-        
-        # pr_fig.add_trace(go.Scatter(
-                            # x=[xmin, xmax],
-                            # y=[ymin, ymax],
-                            # mode="markers",
-                            # marker={"color":[matrixMin, matrixMax],
-                                    # "colorscale":'Viridis',
-                                    # "showscale":True,
-                                    # "colorbar":{"title":"Counts",
-                                                # "titleside": "right"},
-                                    # "opacity": 0
-                                   # }
-                                   # )
-                        # )
-
-        # pr_fig.update_layout(
-            # images=[go.layout.Image(
-                # x=xmin,
-                # sizex=xmax-xmin,
-                # y=ymax,
-                # sizey=ymax-ymin,
-                # xref="x",
-                # yref="y",
-                # opacity=1.0,
-                # layer="below",
-                # sizing="stretch",
-                # source=img)]
-            # )
-            
-            
-        # # Constants
-        # img_width = 1500
-        # img_height = 900
-
-            # # Configure other layout
-        # pr_fig.update_layout(
-            # xaxis=dict(showgrid=False, zeroline=False, range=[xmin, xmax]),
-            # yaxis=dict(showgrid=False, zeroline=False, range=[ymin, ymax]),
-            # width=img_width,
-            # height=img_height,
-        # )
-
-######################
-         
         pr_fig = go.Figure(layout=fig_layout)
-        pr_fig.add_trace(go.Heatmap(
-                                 z=CAFMatrixLog,
-                                 x=x_range,
-                                 y=y_range,
-                                 zsmooth='best', #False,
+
+        # CAFMatrixDummy = np.empty((32,256)) #resize(CAFMatrix,(64,64),order=1) 
+
+        # y_height = CAFMatrixDummy.shape[0]
+        
+        # bistatic_speed_ms = -webInterface_inst.module_signal_processor.max_doppler * c / webInterface_inst.module_receiver.daq_center_freq
+        # bistatic_speed_kmh = bistatic_speed_ms * 3.6
+        
+        # y_range = list(np.linspace(-bistatic_speed_kmh, bistatic_speed_kmh, y_height)) # in Hz
+
+        # x_length = CAFMatrixDummy.shape[1]
+        # bistatic_distance = webInterface_inst.module_signal_processor.max_bistatic_range
+        # bistatic_resolution = c / (webInterface_inst.module_receiver.iq_header.sampling_freq)
+        # bistatic_resolution_km = bistatic_resolution / 1000
+        
+        # x_range = list(np.linspace(0, bistatic_distance*bistatic_resolution_km, x_length)) 
+
+
+        # # pr_fig.add_trace(go.Heatmap(
+                                 # # z=CAFMatrixDummy,
+                                 # # x=x_range,
+                                 # # y=y_range,
+                                 # zsmooth='best', #False,
                                  # zsmooth=False, #False,
-                                 showscale=False,
-                                 # hoverinfo='skip',
-                                 colorscale=[[0.0, '#000020'],
-                                 [0.0714, '#000030'],
-                                 [0.1428, '#000050'],
-                                 [0.2142, '#000091'],
-                                 [0.2856, '#1E90FF'],
-                                 [0.357, '#FFFFFF'],
-                                 [0.4284, '#FFFF00'],
-                                 [0.4998, '#FE6D16'],
-                                 [0.5712, '#FE6D16'],
-                                 [0.6426, '#FF0000'],
-                                 [0.714, '#FF0000'],
-                                 [0.7854, '#C60000'],
-                                 [0.8568, '#9F0000'],
-                                 [0.9282, '#750000'],
-                                 [1.0, '#4A0000']]))        
-                                 
-                                 
+                                 # # showscale=False,
+                                 # # opacity=0,
+                                 # # hoverinfo='skip'
+                                # # ))        
+
+
+        pr_fig.add_trace(go.Scatter(
+                            x=x_range,
+                            y=[0] * len(x_range),
+                            mode="markers",
+                            hoverinfo = 'none',
+                            marker={
+                                    "opacity": 0,
+                                   }
+                                   )
+                        )
+
         pr_fig.update_xaxes(title_text="Bistatic Range [km]",
                     color='rgba(255,255,255,1)',
                     title_font_size=20,
@@ -1465,17 +1442,89 @@ def plot_pr():
                     ticks='outside',
                     showline=True)
 
+        pr_fig.update_layout(hovermode="x")
+        pr_fig.update_layout(
+            images=[go.layout.Image(
+                x=xmin,
+                sizex=xmax-xmin,
+                y=ymax,
+                sizey=ymax-ymin,
+                xref="x",
+                yref="y",
+                opacity=1.0,
+                layer="below",
+                sizing="stretch",
+                source=img)]
+            )
+            
+            
         # Constants
         img_width = 900
-        img_height = 800
+        img_height = 900
 
             # Configure other layout
         pr_fig.update_layout(
-            #xaxis=dict(showgrid=False, zeroline=False, range=[xmin, xmax]),
-            #yaxis=dict(showgrid=False, zeroline=False, range=[ymin, ymax]),
+            xaxis=dict(showgrid=False, zeroline=False, range=[xmin, xmax]),
+            yaxis=dict(showgrid=False, zeroline=False, range=[ymin, ymax]),
             width=img_width,
             height=img_height,
         )
+
+######################
+         
+        # pr_fig = go.Figure(layout=fig_layout)
+        # pr_fig.add_trace(go.Heatmap(
+                                 # z=CAFMatrixLog,
+                                 # x=x_range,
+                                 # y=y_range,
+                                 # zsmooth='best', #False,
+                                 # # zsmooth=False, #False,
+                                 # showscale=False,
+                                 # # hoverinfo='skip',
+                                 # colorscale=[[0.0, '#000020'],
+                                 # [0.0714, '#000030'],
+                                 # [0.1428, '#000050'],
+                                 # [0.2142, '#000091'],
+                                 # [0.2856, '#1E90FF'],
+                                 # [0.357, '#FFFFFF'],
+                                 # [0.4284, '#FFFF00'],
+                                 # [0.4998, '#FE6D16'],
+                                 # [0.5712, '#FE6D16'],
+                                 # [0.6426, '#FF0000'],
+                                 # [0.714, '#FF0000'],
+                                 # [0.7854, '#C60000'],
+                                 # [0.8568, '#9F0000'],
+                                 # [0.9282, '#750000'],
+                                 # [1.0, '#4A0000']]))        
+                                 
+                                 
+        # pr_fig.update_xaxes(title_text="Bistatic Range [km]",
+                    # color='rgba(255,255,255,1)',
+                    # title_font_size=20,
+                    # # tickfont_size=figure_font_size,
+                    # # mirror=True,
+                    # ticks='outside',
+                    # showline=True)
+        # pr_fig.update_yaxes(title_text="Bistatic Speed [km/h]",
+                    # color='rgba(255,255,255,1)',
+                    # title_font_size=20,
+                    # # tickfont_size=figure_font_size,
+                    # # range=[-5, 5],
+                    # # mirror=True,
+                    # ticks='outside',
+                    # showline=True)
+
+        # # Constants
+        # img_width = 900
+        # img_height = 800
+
+            # # Configure other layout
+        # pr_fig.update_layout(
+            # # xaxis=dict(showgrid=False, zeroline=False, range=[xmin, xmax]),
+            # # yaxis=dict(showgrid=False, zeroline=False, range=[ymin, ymax]),
+            # width=img_width,
+            # height=img_height,
+        # )
             
         app.push_mods({
                 'pr-graph': {'figure': pr_fig},
@@ -1545,7 +1594,7 @@ def plot_spectrum():
 
 @app.callback(
     None,
-    [Input(component_id ="kraken_pro_api_key", component_property='children')]
+    [Input(component_id ="kraken_pro_api_key", component_property='value')]
 )
 def update_kraken_pro(apikey):
     webInterface_inst.krakenpro_key = apikey
