@@ -1274,9 +1274,9 @@ def plot_pr():
     #CAFMatrix = CAFMatrix  / np.amax(CAFMatrix)  # Noramlize with the maximum value
     starttime = time.time()
 
-    valueMax = np.amax(CAFMatrix)
-    valueMin = np.amin(CAFMatrix)
-    #CAFMatrix = CAFMatrix - valueMin / (valueMax - valueMin)
+    #valueMax = np.amax(CAFMatrix)
+    #valueMin = np.amin(CAFMatrix)
+    #CAFMatrix = 100 * (CAFMatrix - valueMin) / (valueMax - valueMin)
 
     if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
         webInterface_inst.CAFMatrixPersist = CAFMatrix
