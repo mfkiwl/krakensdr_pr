@@ -51,6 +51,7 @@ from numba import njit, jit
 from PIL import Image
 from matplotlib import cm
 from matplotlib.colors import Normalize
+import matplotlib.colors as colors
 import scipy
 from scipy.ndimage.filters import gaussian_filter
 from skimage.transform import resize
@@ -1256,12 +1257,9 @@ def wr_pr_json(r_b):
     jsonDict["rb"] = r_b
     try:
         r = requests.post('http://127.0.0.1:8042/prpost', json=jsonDict)
-        print(r)
     except requests.exceptions.RequestException as e:
         webInterface_inst.logger.error("Error while posting to local websocket server")
-        print("error: " + str(e))
     
-
 def plot_pr():
     global pr_fig
     c = 299792458
@@ -1271,6 +1269,8 @@ def plot_pr():
     #CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
     #CAFMatrix = CAFMatrix  / np.amax(CAFMatrix)  # Noramlize with the maximum value
     starttime = time.time()
+    #CAFMatrix = resize(CAFMatrix,(1024,1024),order=1) 
+
     CAFMatrix = CAFMatrix - np.amin(CAFMatrix) / (np.amax(CAFMatrix) - np.amin(CAFMatrix))
 
     if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
@@ -1285,9 +1285,9 @@ def plot_pr():
 
     CAFDynRange = webInterface_inst.pr_dynamic_range_max
     CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
+    CAFMatrixLog = resize(CAFMatrixLog,(1024,1024),order=1) 
 
     
-    CAFMatrixLog = resize(CAFMatrixLog,(1024,1024),order=1) 
     endtime = time.time()
 
     print("resize time taken: " + str((endtime-starttime)*1000))
@@ -1318,15 +1318,26 @@ def plot_pr():
         
         x_range = list(np.linspace(0, bistatic_distance*bistatic_resolution_km, x_length)) 
 
-        matrixMax = np.amax(CAFMatrixLog)
-        matrixMin = np.amin(CAFMatrixLog)
-        cNorm = Normalize(vmin=webInterface_inst.pr_dynamic_range_min, vmax=webInterface_inst.pr_dynamic_range_max)
-        scalarMap  = cm.ScalarMappable(cmap='jet')
+        #matrixMax = np.amax(CAFMatrixLog)
+        #matrixMin = np.amin(CAFMatrixLog)
+        #cNorm = Normalize(vmin=webInterface_inst.pr_dynamic_range_min, vmax=webInterface_inst.pr_dynamic_range_max)
+
+        youssef_color_map = ['#000020', '#000030', '#000050', '#000091', '#1E90FF', '#FFFFFF', '#FFFF00', '#FE6D16', '#FE6D16', '#FF0000',
+                             '#FF0000', '#C60000', '#9F0000', '#750000', '#4A0000']
+
+        color_map = colors.ListedColormap(youssef_color_map)
+
+        #scalarMap  = cm.ScalarMappable(cmap='jet')
+
+        scalarMap  = cm.ScalarMappable(cmap=color_map)
+
 
         #smoothedCAFMatrixLog = gaussian_filter(CAFMatrixLog, sigma=0.5)
 
         seg_colors = scalarMap.to_rgba(CAFMatrixLog) 
         img = Image.fromarray(np.uint8(seg_colors*255))
+
+
 
         # img_fig = go.Figure(layout=fig_layout)
         # img_fig.add_trace(go.Heatmap(
@@ -1429,6 +1440,7 @@ def plot_pr():
         pr_fig.update_xaxes(title_text="Bistatic Range [km]",
                     color='rgba(255,255,255,1)',
                     title_font_size=20,
+                    fixedrange = True,
                     # tickfont_size=figure_font_size,
                     # mirror=True,
                     ticks='outside',
@@ -1436,13 +1448,14 @@ def plot_pr():
         pr_fig.update_yaxes(title_text="Bistatic Speed [km/h]",
                     color='rgba(255,255,255,1)',
                     title_font_size=20,
+                    fixedrange = True,
                     # tickfont_size=figure_font_size,
                     # range=[-5, 5],
                     # mirror=True,
                     ticks='outside',
                     showline=True)
 
-        pr_fig.update_layout(hovermode="x")
+        pr_fig.update_layout(hovermode="x", showlegend=False)
         pr_fig.update_layout(
             images=[go.layout.Image(
                 x=xmin,
@@ -1460,7 +1473,7 @@ def plot_pr():
             
         # Constants
         img_width = 900
-        img_height = 900
+        img_height = 800
 
             # Configure other layout
         pr_fig.update_layout(
