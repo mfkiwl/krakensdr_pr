@@ -1276,7 +1276,7 @@ def plot_pr():
 
     valueMax = np.amax(CAFMatrix)
     valueMin = np.amin(CAFMatrix)
-    CAFMatrix = CAFMatrix - valueMin / (valueMax - valueMin)
+    #CAFMatrix = CAFMatrix - valueMin / (valueMax - valueMin)
 
     if webInterface_inst.CAFMatrixPersist is None or webInterface_inst.CAFMatrixPersist.shape != CAFMatrix.shape or not webInterface_inst.en_persist:
         webInterface_inst.CAFMatrixPersist = CAFMatrix
@@ -1290,6 +1290,13 @@ def plot_pr():
 
     CAFDynRange = webInterface_inst.pr_dynamic_range_max
     CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
+
+    #youssef_color_map = ['#000020', '#000030', '#000050', '#000091', '#1E90FF', '#FFFFFF', '#FFFF00', '#FE6D16', '#FE6D16', '#FF0000',
+    #                     '#FF0000', '#C60000', '#9F0000', '#750000', '#4A0000']
+
+    #color_map = colors.ListedColormap(youssef_color_map)
+    scalarMap  = cm.ScalarMappable(cmap=color_map)
+
 
     CAFMatrixLog = resize(CAFMatrixLog,(1024,1024),order=1, anti_aliasing=True) 
     seg_colors = scalarMap.to_rgba(CAFMatrixLog) 
