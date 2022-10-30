@@ -41,24 +41,16 @@ from dash.dash import no_update
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
-import io
-from io import BytesIO
-
 
 import numpy as np
 from configparser import ConfigParser
 from numba import njit, jit
 
-
 from PIL import Image
 from matplotlib import cm
 from matplotlib.colors import Normalize
 import matplotlib.colors as colors
-import scipy
-from scipy.ndimage.filters import gaussian_filter
 from skimage.transform import resize
-
-
 
 from threading import Timer
 
@@ -170,6 +162,7 @@ class webInterface():
         self.daq_cpi               = "-"
         self.daq_if_gains          ="[,,,,]"
         self.en_advanced_daq_cfg   = False
+        self.en_system_control     = False
         self.daq_ini_cfg_dict      = read_config_file_dict()
 
         self.active_daq_ini_cfg    = self.daq_ini_cfg_dict['config_name'] #"Default" # Holds the string identifier of the actively loaded DAQ ini configuration
@@ -549,7 +542,7 @@ def generate_config_page_layout(webInterface_inst):
     en_persist_values     =[1] if webInterface_inst.en_persist else []
     en_pr_values          =[1] if webInterface_inst.module_signal_processor.en_PR else []
 
-    en_advanced_daq_cfg   =[1] if webInterface_inst.en_advanced_daq_cfg                       else []
+    en_advanced_daq_cfg   =[1] if webInterface_inst.en_advanced_daq_cfg else []
     # Calulcate spacings
     wavelength= 300 / webInterface_inst.daq_center_freq
 
@@ -622,7 +615,7 @@ def generate_config_page_layout(webInterface_inst):
         html.H2("RF Receiver Configuration", id="init_title_c"),
         html.Div([
                 html.Div("Center Frequency [MHz]", className="field-label"),
-                dcc.Input(id='daq_center_freq', value=webInterface_inst.module_receiver.daq_center_freq/10**6, type='number', debounce=True, className="field-body-textbox")
+                dcc.Input(id='daq_center_freq', value=webInterface_inst.module_receiver.daq_center_freq/10**6, type='number', min=0, step=0.01, debounce=True, className="field-body-textbox")
                 ], className="field"),
         html.Div([
                 html.Div("CH0 Reference Gain", className="field-label"), 
@@ -665,15 +658,15 @@ def generate_config_page_layout(webInterface_inst):
 
         html.Div([html.Div("Basic Custom DAQ Configuration", id="label_en_basic_daq_cfg"     , className="field-label")]),
             html.Div([
-                html.Div("Data Block Length (ms):", className="field-label"),                                         
+                html.Div("Data Block Length [ms]:", className="field-label"),                                         
                 dcc.Input(id='cfg_data_block_len', value=cfg_data_block_len, type='number', debounce=True, className="field-body-textbox")
             ], className="field"),
             html.Div([
-                html.Div("Decimated Bandwidth (kHz):", className="field-label"),                                         
+                html.Div("Decimated Bandwidth [kHz]:", className="field-label"),                                         
                 dcc.Input(id='cfg_decimated_bw', value=cfg_decimated_bw, type='number', debounce=True, className="field-body-textbox")
             ], className="field"),
             html.Div([
-                html.Div("Recalibration Interval (mins):", className="field-label"),                                         
+                html.Div("Recalibration Interval [mins]:", className="field-label"),                                         
                 dcc.Input(id='cfg_recal_interval', value=cfg_recal_interval, type='number', debounce=True, className="field-body-textbox")
             ], className="field"),
 
@@ -871,7 +864,7 @@ def generate_config_page_layout(webInterface_inst):
             
         html.Div([html.Div("Max Bistatic Speed [km/h]:"             , id="label_max_bistatic_speed_kmh"  ,style={"display":"inline-block"}, className="field-label"), 
             dcc.Input(id="max_bistatic_speed_kmh", value=abs(webInterface_inst.max_bistatic_speed_kmh), type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
-        ], style={'display':'inline-block'}, className="field"),
+        ], className="field"),
 
         #html.Div([html.Div("Max Doppler [Hz]:"             , id="label_max_doppler"  ,style={"display":"inline-block"}, className="field-label"), 
         #    dcc.Input(id="max_doppler", value=webInterface_inst.module_signal_processor.max_doppler, type='number', style={"display":"inline-block"}, debounce=True, #className="field-body-textbox")
@@ -882,32 +875,41 @@ def generate_config_page_layout(webInterface_inst):
         ], className="field"),
 
         html.Div([html.Div("Persist Decay:"             , id="label_persist_decay"  ,style={"display":"inline-block"}, className="field-label"), 
-            dcc.Input(id="persist_decay", value=webInterface_inst.pr_persist_decay, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
-            ], style={'display':'inline-block'}, className="field"),
+            dcc.Input(id="persist_decay", value=webInterface_inst.pr_persist_decay, type='number', min=0, max=1, step=0.01, style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
+            ], className="field"),
 
 
         html.Div([html.Div("Dynamic Range (Min):"             , id="label_dynrange_min"  ,style={"display":"inline-block"}, className="field-label"), 
             dcc.Input(id="dynrange_min", value=webInterface_inst.pr_dynamic_range_min, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
-            ], style={'display':'inline-block'}, className="field"),
+            ], className="field"),
 
         html.Div([html.Div("Dynamic Range (Max):"             , id="label_dynrange_max"  ,style={"display":"inline-block"}, className="field-label"), 
             dcc.Input(id="dynrange_max", value=webInterface_inst.pr_dynamic_range_max, type='number', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
-            ], style={'display':'inline-block'}, className="field"),
-
-
-
+            ], className="field"),
 
     ], className="card")
-
-
-
 
     krakenpro_config_card = \
     html.Div([
         html.H2("Kraken Pro Config", id="init_title_d"),
         html.Div([html.Div("Kraken Pro API Key:"             , id="label_kraken_pro_api_key"  ,style={"display":"inline-block"}, className="field-label"), 
             dcc.Input(id="kraken_pro_api_key", value=webInterface_inst.krakenpro_key, type='text', style={"display":"inline-block"}, debounce=True, className="field-body-textbox")
-        ], style={'display':'inline-block'}, className="field"),
+        ], className="field"),
+
+    ], className="card")
+
+    system_control_card = \
+    html.Div([
+        html.Div([html.Div("Open System Control", id="label_en_system_control"     , className="field-label"),
+                dcc.Checklist(options=option     , id="en_system_control"     ,  className="field-body", value=webInterface_inst.en_system_control),
+        ], className="field"),
+
+        html.Div([
+            html.H2("System Control", id="init_title_d"),
+                  html.Div([html.Button('Restart Software', id='btn-restart_sw', className="btn-restart_sw", n_clicks=0)], className="field"),
+                  html.Div([html.Button('Restart Pi', id='btn-restart_system', className="btn-restart_system", n_clicks=0)], className="field"),
+                  html.Div([html.Button('Shutdown Pi', id='btn-shtudown_system', className="btn-shtudown_system", n_clicks=0)], className="field")
+        ], id='system_control_container'),
 
     ], className="card")
 
@@ -915,7 +917,7 @@ def generate_config_page_layout(webInterface_inst):
     #    Display Options Card
     #-----------------------------
     #config_page_component_list = [daq_config_card, daq_status_card, dsp_config_card, display_options_card,squelch_card]
-    config_page_component_list = [start_stop_card, daq_config_card, daq_status_card, dsp_config_card, krakenpro_config_card]
+    config_page_component_list = [start_stop_card, daq_config_card, daq_status_card, dsp_config_card, krakenpro_config_card, system_control_card]
 
     if not webInterface_inst.disable_tooltips:
         config_page_component_list.append(tooltips.dsp_config_tooltips)
@@ -1243,6 +1245,31 @@ def stop_proc_btn(input_value):
 def save_config_btn(input_value):
     webInterface_inst.logger.info("Saving DAQ and DSP Configuration")
     webInterface_inst.save_configuration()
+
+@app.callback_shared(
+    None,
+    [Input(component_id='btn-restart_sw', component_property='n_clicks')],
+)
+def restart_sw_btn(input_value):
+    webInterface_inst.logger.info("Restarting Software")
+    root_path             = os.path.dirname(os.path.dirname(os.path.dirname(current_path)))
+    print(root_path)
+
+@app.callback_shared(
+    None,
+    [Input(component_id='btn-restart_system'     , component_property='n_clicks')],
+)
+def restart_system_btn(input_value):
+    webInterface_inst.logger.info("Restarting System")
+    subprocess.call(["reboot"])
+
+@app.callback_shared(
+    None,
+    [Input(component_id='btn-shtudown_system'     , component_property='n_clicks')],
+)
+def shutdown_system_btn(input_value):
+    webInterface_inst.logger.info("Shutting System Down")
+    subprocess.call(["shutdown -n now"])  
     
     
 @app.callback_shared(
@@ -1291,10 +1318,6 @@ def plot_pr():
     CAFDynRange = webInterface_inst.pr_dynamic_range_max
     CAFMatrixLog[CAFMatrixLog > CAFDynRange] = CAFDynRange
 
-    #youssef_color_map = ['#000020', '#000030', '#000050', '#000091', '#1E90FF', '#FFFFFF', '#FFFF00', '#FE6D16', '#FE6D16', '#FF0000',
-    #                     '#FF0000', '#C60000', '#9F0000', '#750000', '#4A0000']
-
-    #color_map = colors.ListedColormap(youssef_color_map)
     scalarMap  = cm.ScalarMappable(cmap=color_map)
 
 
@@ -1786,6 +1809,17 @@ def update_daq_ini_params(
 )
 def toggle_adv_daq(toggle_value):
     webInterface_inst.en_advanced_daq_cfg = toggle_value
+    if toggle_value:
+        return {'display': 'block'}
+    else:
+        return {'display': 'none'}
+
+
+@app.callback(Output('system_control_container', 'style'),
+             [Input("en_system_control", "value")]
+)
+def toggle_adv_daq(toggle_value):
+    webInterface_inst.en_system_control = toggle_value
     if toggle_value:
         return {'display': 'block'}
     else:
