@@ -1283,7 +1283,7 @@ def shutdown_system_btn(input_value):
     subprocess.call(["shutdown -n now"])  
     
     
-@app.callback(
+@app.callback_shared(
     None,
     [Input('pr-graph', 'clickData')]
 )
