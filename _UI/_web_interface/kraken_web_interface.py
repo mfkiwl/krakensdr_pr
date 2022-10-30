@@ -46,13 +46,14 @@ import numpy as np
 from configparser import ConfigParser
 from numba import njit, jit
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from matplotlib import cm
 from matplotlib.colors import Normalize
 import matplotlib.colors as colors
 from skimage.transform import resize
 
 from threading import Timer
+from multiprocessing.dummy import Pool
 
 c = 299792458
 
@@ -107,6 +108,7 @@ class webInterface():
         if not settings_found:
             self.logger.warning("Web Interface settings file is not found!")
 
+        self.pool = Pool()
         #############################################
         #  Initialize and Configure Kraken modules  #
         #############################################
@@ -194,6 +196,8 @@ class webInterface():
         self.max_bistatic_speed_kmh = (self.module_signal_processor.max_doppler * c / self.module_receiver.daq_center_freq) * 3.6 # TODO: set this based on max_doppler in settings
 
         self.krakenpro_key = dsp_settings.get("krakenpro_key", "mykey")
+
+        self.r_b = 1
 
         if self.daq_ini_cfg_dict is not None:
             self.logger.info("Config file found and read succesfully")
@@ -661,22 +665,21 @@ def generate_config_page_layout(webInterface_inst):
 
         html.Div([ #basic daq config id
 
-            html.Div([html.Div("Custom DAQ Configuration", id="label_en_basic_daq_cfg"     , className="field-label")]),
-                html.Div([
-                    html.Div("Data Block Length [ms]:", id="label_daq_config_data_block_len", className="field-label"),
-                    dcc.Input(id='cfg_data_block_len', value=cfg_data_block_len, type='number', debounce=True, className="field-body-textbox")
-                ], className="field"),
-                html.Div([
-                    html.Div("Recalibration Interval [mins]:", id="label_recal_interval", className="field-label"),
-                    dcc.Input(id='cfg_recal_interval', value=cfg_recal_interval, type='number', debounce=True, className="field-body-textbox")
-                ], className="field"),
+            html.Div([
+                html.Div("Data Block Length [ms]:", id="label_daq_config_data_block_len", className="field-label"),
+                dcc.Input(id='cfg_data_block_len', value=cfg_data_block_len, type='number', debounce=True, className="field-body-textbox")
+            ], className="field"),
+            html.Div([
+                html.Div("Recalibration Interval [mins]:", id="label_recal_interval", className="field-label"),
+                dcc.Input(id='cfg_recal_interval', value=cfg_recal_interval, type='number', debounce=True, className="field-body-textbox")
+            ], className="field"),
 
             html.Div([html.Div("Advanced Custom DAQ Configuration", id="label_en_advanced_daq_cfg"     , className="field-label"),
                     dcc.Checklist(options=option     , id="en_advanced_daq_cfg"     ,  className="field-body", value=en_advanced_daq_cfg),
             ], className="field"),
 
-        # --> Optional DAQ Subsystem reconfiguration fields <--
-        #daq_subsystem_reconfiguration_options = [ \
+            # --> Optional DAQ Subsystem reconfiguration fields <--
+            #daq_subsystem_reconfiguration_options = [ \
             html.Div([
                 html.H2("DAQ Subsystem Reconfiguration", id="init_title_reconfig"),
                 html.H3("HW", id="cfg_group_hw"),
@@ -1280,12 +1283,13 @@ def shutdown_system_btn(input_value):
     subprocess.call(["shutdown -n now"])  
     
     
-@app.callback_shared(
+@app.callback(
     None,
     [Input('pr-graph', 'clickData')]
 )
 def click_pr_spectrum(clickData):
     r_b = clickData['points'][0]['x']
+    webInterface_inst.r_b = r_b
     print(r_b)    
     wr_pr_json(r_b)
     # upload json here
@@ -1295,7 +1299,8 @@ def wr_pr_json(r_b):
     jsonDict = {}
     jsonDict["rb"] = r_b
     try:
-        r = requests.post('http://127.0.0.1:8042/prpost', json=jsonDict)
+        #r = requests.post('http://127.0.0.1:8042/prpost', json=jsonDict)
+        r = webInterface_inst.pool.apply_async(requests.post, kwds={'url': 'http://127.0.0.1:8042/prpost', 'json': jsonDict})
     except requests.exceptions.RequestException as e:
         webInterface_inst.logger.error("Error while posting to local websocket server")
     
@@ -1308,6 +1313,12 @@ def plot_pr():
     #CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
     #CAFMatrix = CAFMatrix  / np.amax(CAFMatrix)  # Noramlize with the maximum value
     starttime = time.time()
+
+    max_bistatic_distance_cells = webInterface_inst.module_signal_processor.max_bistatic_range
+    bistatic_resolution = c / (webInterface_inst.module_receiver.iq_header.sampling_freq)
+    bistatic_resolution_km = bistatic_resolution / 1000
+    max_bistatic_distance = max_bistatic_distance_cells*bistatic_resolution_km
+
 
     #valueMax = np.amax(CAFMatrix)
     #valueMin = np.amin(CAFMatrix)
@@ -1328,10 +1339,18 @@ def plot_pr():
 
     scalarMap  = cm.ScalarMappable(cmap=color_map)
 
+    maxImageX = 1024
+    maxImageY = 1024
 
-    CAFMatrixLog = resize(CAFMatrixLog,(1024,1024),order=1, anti_aliasing=True) 
+    CAFMatrixLog = resize(CAFMatrixLog,(maxImageY,maxImageX),order=1, anti_aliasing=True) 
     seg_colors = scalarMap.to_rgba(CAFMatrixLog) 
     img = Image.fromarray(np.uint8(seg_colors*255))
+    line = ImageDraw.Draw(img)
+
+    r_b_pixel = (webInterface_inst.r_b / max_bistatic_distance) * maxImageX
+    shape = ((r_b_pixel, maxImageX), (r_b_pixel,0))
+
+    line.line(shape, fill="orange", width=1)
 
     #webInterface_inst.pr_graph_reset_flag = True
     if not webInterface_inst.pr_graph_reset_flag:
@@ -1362,10 +1381,6 @@ def plot_pr():
         y_range = list(np.linspace(-bistatic_speed_kmh, bistatic_speed_kmh, y_height)) # in Hz
 
         x_length = CAFMatrixLog.shape[1]
-        bistatic_distance = webInterface_inst.module_signal_processor.max_bistatic_range
-        bistatic_resolution = c / (webInterface_inst.module_receiver.iq_header.sampling_freq)
-        bistatic_resolution_km = bistatic_resolution / 1000
-        max_bistatic_distance = bistatic_distance*bistatic_resolution_km
         
         x_range = list(np.linspace(0, max_bistatic_distance, x_length)) 
 
@@ -1492,7 +1507,7 @@ def plot_pr():
         })
 
     endtime = time.time()
-    print("full plot time taken: " + str((endtime-starttime)*1000))
+    #print("full plot time taken: " + str((endtime-starttime)*1000))
 
 
 def plot_spectrum():
