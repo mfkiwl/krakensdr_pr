@@ -18,9 +18,19 @@ See our Wiki for more information about our VirtualBox Image and where to downlo
 
 Once you are in the OS to start the passive radar code, open a terminal and browse to the `krakensdr_pr` folder. Then run `./kraken_pr_start.sh`. Next see the Running heading below.
 
+
+
+
 ## Manual Installation
 
-This is only required if you are not using the premade images, and are setting up the software from a clean system. 
+### Install script
+You can use on of our install scripts to automate a manual install. Details on the Wiki at https://github.com/krakenrf/krakensdr_docs/wiki/10.-VirtualBox,-Docker-Images-and-Install-Scripts#install-scripts
+
+We recommend using this script instead of manually typing each command one by one.
+
+### Manual Hand Install
+
+This is only required if you are not using the premade images, scripts, and are setting up the software from a clean system. 
 
 1. Install the prerequisites
 
