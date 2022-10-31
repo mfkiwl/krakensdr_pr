@@ -59,6 +59,7 @@ pip3 install pyfftw
 
 conda install -y dash==1.20.0
 conda install -y werkzeug==2.0.2
+```
 
 4. Clone the krakensdr_pr software
 
