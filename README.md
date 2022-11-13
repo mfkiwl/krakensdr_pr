@@ -18,9 +18,19 @@ See our Wiki for more information about our VirtualBox Image and where to downlo
 
 Once you are in the OS to start the passive radar code, open a terminal and browse to the `krakensdr_pr` folder. Then run `./kraken_pr_start.sh`. Next see the Running heading below.
 
+
+
+
 ## Manual Installation
 
-This is only required if you are not using the premade images, and are setting up the software from a clean system. 
+### Install script
+You can use on of our install scripts to automate a manual install. Details on the Wiki at https://github.com/krakenrf/krakensdr_docs/wiki/10.-VirtualBox,-Docker-Images-and-Install-Scripts#install-scripts
+
+We recommend using this script instead of manually typing each command one by one.
+
+### Manual Hand Install
+
+This is only required if you are not using the premade images, scripts, and are setting up the software from a clean system. 
 
 1. Install the prerequisites
 
@@ -43,21 +53,22 @@ Please run the installs in this order as we need to ensure a specific version of
 ``` bash
 conda activate kraken
 
-conda install pip
-conda install quart
 conda install pandas
 conda install orjson
 conda install matplotlib
+conda install requests
 
-pip3 install dash_bootstrap_components
-pip3 install quart_compress
-pip3 install dash_devices
+pip3 install dash_bootstrap_components==1.1.0
+pip3 install quart_compress==0.2.1
+pip3 install quart==0.17.0
+pip3 install dash_devices==0.1.3
+
 pip3 install pyapril
 pip3 install cython
 pip3 install pyfftw
 
-conda install dash==1.20.0
-conda install werkzeug==2.0.2
+conda install -y dash==1.20.0
+conda install -y werkzeug==2.0.2
 ```
 
 4. Clone the krakensdr_pr software
@@ -67,7 +78,7 @@ cd ~/krakensdr
 git clone https://github.com/krakenrf/krakensdr_pr
 ```
 
-Copy the the *krakensdr_doa/util/kraken_doa_start.sh* and the *krakensdr_doa/util/kraken_doa_stop.sh* scripts into the krakensdr root folder of the project.
+Copy the the *krakensdr_pr/util/kraken_pr_start.sh* and the *krakensdr_doa/util/kraken_pr_stop.sh* scripts into the krakensdr root folder of the project.
 ```bash
 cd ~/krakensdr
 cp krakensdr_pr/util/kraken_pr_start.sh .
