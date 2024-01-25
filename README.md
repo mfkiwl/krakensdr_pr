@@ -1,22 +1,17 @@
 # Kraken SDR Passive Radar
 
-Please consult our Passive Radar Wiki page at https://github.com/krakenrf/krakensdr_docs/wiki/08.-Passive-Radar for more information.
+The Kraken devs decided to remove the passive radar code from their repo: https://forum.krakenrf.com/t/where-has-the-passive-radar-code-gone/98.  Forks of it exist [[1]](https://github.com/yuvadm) [[2]](https://github.com/cipher0x/krakensdr_pr) [[3]](https://github.com/CryptoPunk/krakensdr) but are unmaintained and do not provide instructions on directory structure or software configuration. 
+
+
+This repo includes instructions on setup and removes the need for `conda` in favor of `pip`.
 
 ## Quickstart Raspberry Pi 4 Image
+ 
+There is currently no premade Pi image available.  If this changes a link will exist in this section.
 
-The passive radar software is preinstalled on the DOA PI4 Image at https://github.com/krakenrf/krakensdr_doa/releases/
+## Docker Container
 
-By default this image runs the DOA direction finding code on boot.
-
-To change to the passive radar code, connect a monitor and keyboard (or SSH in), and edit start.sh in the home folder. You will need to comment out the DOA code run lines, and uncomment the passive radar lines.
-
-Make sure to change the heimdall preconfig file to pr_2ch_2pow20, pr_2ch_2pow21 or pr_2ch_2pow22
-
-## Quickstart VirtualBox Image
-
-See our Wiki for more information about our VirtualBox Image and where to download it https://github.com/krakenrf/krakensdr_docs/wiki/10.-VirtualBox-and-Docker-Images#virtualbox
-
-Once you are in the OS to start the passive radar code, open a terminal and browse to the `krakensdr_pr` folder. Then run `./kraken_pr_start.sh`. Next see the Running heading below.
+WIP - will update here when tested and ready
 
 ## Manual Installation
 
@@ -26,80 +21,134 @@ This is only required if you are not using the premade images, and are setting u
 
 ``` bash
 sudo apt update
-sudo apt install libfftw3-3
-sudo apt install libfftw3-dev
+sudo apt install libfftw3-3 libfftw3-dev python3-pip
 ```
 
 2. Install Heimdall DAQ
 
-If not done already, first, follow the instructions at https://github.com/krakenrf/heimdall_daq_fw/tree/development to install the Heimdall DAQ Firmware.
+If not done already, first, follow the instructions at https://github.com/ss32/heimdall_daq_fw to install the Heimdall DAQ Firmware.
 
-3. Set up Miniconda environment
+3. Clone the `krakensdr_pr`` software
 
-You will have created a Miniconda environment during the Heimdall DAQ install phase.
+```bash
+cd ~/kraknrf
+git clone https://github.com/ss32/krakensdr_pr
+```
 
-Please run the installs in this order as we need to ensure a specific version of dash is installed.
+4. Install Python dependencies
 
 ``` bash
-conda activate kraken
-
-conda install pip
-conda install quart
-conda install pandas
-conda install orjson
-conda install matplotlib
-
-pip3 install dash_bootstrap_components
-pip3 install quart_compress
-pip3 install dash_devices
-pip3 install pyapril
-pip3 install cython
-pip3 install pyfftw
-
-conda install dash==1.20.0
-conda install werkzeug==2.0.2
-```
-
-4. Clone the krakensdr_pr software
-
-```bash
-cd ~/krakensdr
-git clone https://github.com/krakenrf/krakensdr_pr
-```
-
-Copy the the *krakensdr_doa/util/kraken_doa_start.sh* and the *krakensdr_doa/util/kraken_doa_stop.sh* scripts into the krakensdr root folder of the project.
-```bash
-cd ~/krakensdr
-cp krakensdr_pr/util/kraken_pr_start.sh .
-cp krakensdr_pr/util/kraken_pr_stop.sh .
+python3 -m pip install requirements.txt -U
 ```
 
 ## Running
 
-### Local operation (Recommended)
+### Directory Structure
+Assuming you have followed the instructions including installing Heimdadll DAQ you should have a directory structure in `~/krakenrf` that looks like this
 
+```
+.
+├── heimdall_daq_fw
+│   ├── config_files
+│   │   ├── kerberos_default
+│   │   ├── kraken_default
+│   │   ├── kraken_development
+│   │   ├── pr_2ch_2pow16
+│   │   ├── pr_2ch_2pow20
+│   │   ├── pr_2ch_2pow21
+│   │   ├── pr_2ch_2pow22
+│   │   └── unit_test_k4
+│   ├── Documentation
+│   ├── Firmware
+│   │   ├── _calibration
+│   │   ├── _daq_core
+│   │   │   └── __pycache__
+│   │   ├── _data_control
+│   │   ├── _logs
+│   │   ├── __pycache__
+│   │   └── _testing
+│   │       ├── test_logs
+│   │       └── unit_test
+│   └── util
+└── krakensdr_pr
+    ├── _receiver
+    │   └── __pycache__
+    ├── _signal_processing
+    │   └── __pycache__
+    ├── _UI
+    │   └── _web_interface
+    │       ├── assets
+    │       └── __pycache__
+    └── util
+```
+
+### Local operation
+
+
+
+Use CH0 to connect your reference antenna, and CH1 for your surveillance antenna.
+
+Start
 ```bash
 ./kraken_pr_start.sh
 ```
 
-Then browse to KRAKEN_IP_ADDR:8080 in a webbrowser on a computer on the same network.
+Expected output after entering sudo password:
 
-When the GUI loads, make sure to set an appropriate passive radar preconfig ini for the Heimdall DAQ. For example, choose "pr_2ch_2pow21", then click on "Reconfigure and Restart DAQ". This will configure the DAQ for passive radar, and then start the processing.
+```
+$ ./kraken_pr_start.sh 
+[sudo] password for krakenrf: 
+Config file check bypassed [ WARNING ]
+kernel.sched_rt_runtime_us = -1
+Desig FIR filter with the following parameters: 
+Decimation ratio: 1
+Bandwidth: 1.00
+Tap size: 1
+Window function: hann
+FIR filter ready
+Transfer funcfion is exported to :  _logs/Decimator_filter_transfer.html
+Coefficients are exported to:  _data_control/fir_coeffs.txt
+Starting DAQ Subsystem
+Output data interface: Shared memory
+      )  (     
+      (   ) )  
+       ) ( (   
+     _______)_ 
+  .-'---------|
+ (  |/\/\/\/\/|
+  '-./\/\/\/\/|
+    '_________'
+     '-------' 
+               
+Have a coffee watch radar
+Starting KrakenSDR Passive Radar
+
+```
+
+Browse to `0.0.0.0:8080` if running locally or `<HOST_IP>:8080` if running on another machine on the same network.
+
+By default the `.ini` that is loaded is configured for passive radar, but others are available in the dropdown menu.  Alternatively, copy the contents of one of the `pr_2ch_xxxx` [config files](https://github.com/ss32/heimdall_daq_fw/tree/main/config_files) to `heimdall_daq_fw/firmware/daq_chain_config.ini`prior to starting.
 
 Please be patient on the first run, at it can take 1-2 minutes for the JIT numba compiler to compile the numba optimized functions, and during this compilation time it may appear that the software has gotten stuck. On subsqeuent runs this loading time will be much faster as it will read from cache.
 
-Use CH0 to connect your reference antenna, and CH1 for your surveillance antenna.)
+Click `Start Processing` and wait for all statuses to go green. 
 
-### Remote operation
+![statuses](./images/statuses.jpg)
 
-*UNTESTED*
+Check the waterfall interface to confirm you have clean signals.  If everything is working as expected you can go to the Passive Radar interface and should see low correlation at all offsets other than 0Hz.
 
-1. Start the DAQ Subsystem either remotely. (Make sure that the *daq_chain_config.ini* contains the proper configuration) 
-    (See:https://github.com/krakenrf/heimdall_daq_fw/Documentation)
-2. Set the IP address of the DAQ Subsystem in the settings.json, *default_ip* field.
-3. Start the DoA DSP software by typing:
-`./gui_run.sh`
-4. To stop the server and the DSP processing chain run the following script:
-`./kill.sh`
+![passive_plot](./images/passive_plot.jpg)
 
-<p1> After starting the script a web based server opens at port number 8088, which then can be accessed by typing "KRAKEN_IP:8080/" in the address bar of any web browser. You can find the IP address of the KrakenSDR Pi4 wither via your routers WiFi management page, or by typing "ip addr" into the terminal. You can also use the hostname of the Pi4 in place of the IP address, but this only works on local networks, and not the internet, or mobile hotspot networks. </p1>
+
+To stop the software run the stop script:
+
+```bash
+./kraken_pr_stop.sh
+```
+
+### Troubleshooting 
+
+ * Check the contents of `krakensdr_pr/ui.log`
+ * Check the contents of the logs in `heimdall_daq_fw/Firmware/_logs/`
+
+If the issue is a problem with this repo please open a bug report.
