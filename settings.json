@@ -1,21 +1,21 @@
 {
-  "center_freq": 569.0,
-  "gain_1": 25.4,
-  "gain_2": 7.7,
+  "center_freq": 488.31,
+  "gain_1": 28,
+  "gain_2": 15.7,
   "data_interface": "shmem",
   "default_ip": "0.0.0.0",
   "en_pr": true,
   "clutter_cancel_algo": "Wiener MRE",
-  "max_bistatic_range": 128,
-  "max_doppler": 256,
+  "max_bistatic_range": 512,
+  "max_doppler": 452.45189812836,
   "en_pr_persist": true,
-  "pr_persist_decay": 0.99,
-  "pr_dynrange_min": -20,
-  "pr_dynrange_max": 10,
+  "pr_persist_decay": 0.97,
+  "pr_dynrange_min": 0,
+  "pr_dynrange_max": 50,
   "en_hw_check": 0,
-  "en_advanced_daq_cfg": [
-    1
-  ],
+  "en_advanced_daq_cfg": [],
   "logging_level": 5,
-  "disable_tooltips": 0
+  "disable_tooltips": 0,
+  "krakenpro_key": "0ae4ca6",
+  "doa_data_format": "Kraken Pro Remote"
 }
