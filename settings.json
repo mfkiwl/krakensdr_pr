@@ -17,5 +17,8 @@
   "logging_level": 5,
   "disable_tooltips": 0,
   "krakenpro_key": "0ae4ca6",
-  "doa_data_format": "Kraken Pro Remote"
+  "doa_data_format": "Kraken Pro Remote",
+  "save_radar_plots": false,
+  "save_raw_radar_data": false,
+  "data_output_directory": "/tmp/radar_data"
 }

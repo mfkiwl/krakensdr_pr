@@ -55,6 +55,9 @@ from skimage.transform import resize
 from threading import Timer
 from multiprocessing.dummy import Pool
 
+from pathlib import Path
+import pickle
+
 c = 299792458
 
 # Import Kraken SDR modules
@@ -189,6 +192,12 @@ class webInterface():
         self.reset_spectrum_graph_flag = False
         self.CAFMatrixPersist = None
 
+        # Data Logging
+        self.log_imagery = dsp_settings.get("save_radar_plots")
+        self.log_raw_radar = dsp_settings.get("save_raw_radar_data")
+        self.data_output_directory = dsp_settings.get("data_output_directory")
+
+
         # Basic DAQ Config
         self.decimated_bandwidth = 12.5
         
@@ -207,6 +216,10 @@ class webInterface():
             """
             self.module_receiver.M = self.daq_ini_cfg_dict['num_ch']
             #self.module_receiver.M = self.daq_ini_cfg_params[1]
+        
+        if self.log_imagery or self.log_raw_radar:
+            self.image_dir = Path(self.data_output_directory) / Path("imagery")
+            self.radar_dir = Path(self.data_output_directory) / Path("radar_data")
 
 
     def save_configuration(self):
@@ -397,6 +410,12 @@ doa_trace_colors =	{
   "DoA MUSIC"   : "rgb(257,233,111)"
 }
 figure_font_size = 20
+
+# Data Logging
+if webInterface_inst.log_imagery or webInterface_inst.log_raw_radar:
+    os.makedirs(webInterface_inst.image_dir,666,exist_ok=True)
+    os.makedirs(webInterface_inst.radar_dir,666,exist_ok=True)
+
 
 y=np.random.normal(0,1,2**3)
 x=np.arange(2**3)
@@ -1303,16 +1322,19 @@ def wr_pr_json(r_b):
         r = webInterface_inst.pool.apply_async(requests.post, kwds={'url': 'http://127.0.0.1:8042/prpost', 'json': jsonDict})
     except requests.exceptions.RequestException as e:
         webInterface_inst.logger.error("Error while posting to local websocket server")
-    
+
 def plot_pr():
     global pr_fig
     c = 299792458
 
     CAFMatrix = np.abs(webInterface_inst.RD_matrix)
-
+    ts = time.time_ns()
+    if webInterface_inst.log_raw_radar:
+        file_path = webInterface_inst.radar_dir / f"{ts}.pkl"
+        with open(file_path,'wb') as outfile:
+            pickle.dump(CAFMatrix,outfile)
     #CAFMatrix = CAFMatrix  / 50 #/  np.amax(CAFMatrix)  # Noramlize with the maximum value
     #CAFMatrix = CAFMatrix  / np.amax(CAFMatrix)  # Noramlize with the maximum value
-    starttime = time.time()
 
     max_bistatic_distance_cells = webInterface_inst.module_signal_processor.max_bistatic_range
     bistatic_resolution = c / (webInterface_inst.module_receiver.iq_header.sampling_freq)
@@ -1339,14 +1361,16 @@ def plot_pr():
 
     scalarMap  = cm.ScalarMappable(cmap=color_map)
 
-    maxImageX = 1024
-    maxImageY = 1024
+    maxImageX = 1280
+    maxImageY = 1280
 
     CAFMatrixLog = resize(CAFMatrixLog,(maxImageY,maxImageX),order=1, anti_aliasing=True) 
     seg_colors = scalarMap.to_rgba(CAFMatrixLog) 
     img = Image.fromarray(np.uint8(seg_colors*255))
     line = ImageDraw.Draw(img)
-
+    if webInterface_inst.log_imagery:
+        image_path = webInterface_inst.image_dir / f"{ts}.png"
+        img.save(image_path)
     r_b_pixel = (webInterface_inst.r_b / max_bistatic_distance) * maxImageX
     shape = ((r_b_pixel, maxImageX), (r_b_pixel,0))
 
